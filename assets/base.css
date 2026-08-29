@@ -1,0 +1,655 @@
+/* fy-docs stylesheet: themes the semantic HTML exported from the fy specs.
+   Palette contract with fy-spec: see fy-spec/README.md ("HTML 导出出口").
+   Color palettes are taken verbatim from the Rust/mdBook documentation theme
+   (light / rust / coal / navy / ayu); derived tones use color-mix. */
+
+/* ---- palettes (mdBook variables-*.css values) ----------------------------- */
+
+:root,
+html.light {
+  color-scheme: light;
+  --bg: hsl(0, 0%, 100%);
+  --ink: hsl(0, 0%, 0%);
+  --sidebar-bg: #fafafa;
+  --sidebar-fg: hsl(0, 0%, 0%);
+  --sidebar-active: #1f1fff;
+  --border: hsl(0, 0%, 95%);
+  --links: #20609f;
+  --inline-code-color: #301900;
+  --accent-note: #0969da;
+  --accent-tip: #008000;
+  --accent-important: #8250df;
+  --accent-warning: #9a6700;
+  --accent-caution: #b52731;
+}
+
+html.rust {
+  color-scheme: light;
+  --bg: hsl(60, 9%, 87%);
+  --ink: #262625;
+  --sidebar-bg: #3b2e2a;
+  --sidebar-fg: #c8c9db;
+  --sidebar-active: #e69f67;
+  --border: hsl(60, 9%, 82%);
+  --links: #2b79a2;
+  --inline-code-color: #6e6b5e;
+  --code-bg: #f6f7f6;
+  --accent-note: #023b95;
+  --accent-tip: #007700;
+  --accent-important: #8250df;
+  --accent-warning: #603700;
+  --accent-caution: #aa1721;
+}
+
+html.coal {
+  color-scheme: dark;
+  --bg: hsl(200, 7%, 8%);
+  --ink: #98a3ad;
+  --sidebar-bg: #292c2f;
+  --sidebar-fg: #a1adb8;
+  --sidebar-active: #3473ad;
+  --border: hsl(200, 7%, 13%);
+  --links: #2b79a2;
+  --inline-code-color: #c5c8c6;
+  --code-bg: #1d1f21;
+  --code-fg: #c5c8c6;
+  --accent-note: #4493f8;
+  --accent-tip: #08ae08;
+  --accent-important: #ab7df8;
+  --accent-warning: #d29922;
+  --accent-caution: #d91b29;
+}
+
+html.navy {
+  color-scheme: dark;
+  --bg: hsl(226, 23%, 11%);
+  --ink: #bcbdd0;
+  --sidebar-bg: #282d3f;
+  --sidebar-fg: #c8c9db;
+  --sidebar-active: #2b79a2;
+  --border: hsl(226, 23%, 16%);
+  --links: #2b79a2;
+  --inline-code-color: #c5c8c6;
+  --code-bg: #1d1f21;
+  --code-fg: #c5c8c6;
+  --accent-note: #4493f8;
+  --accent-tip: #09ca09;
+  --accent-important: #ab7df8;
+  --accent-warning: #d29922;
+  --accent-caution: #f21424;
+}
+
+html.ayu {
+  color-scheme: dark;
+  --bg: hsl(210, 25%, 8%);
+  --ink: #c5c5c5;
+  --sidebar-bg: #14191f;
+  --sidebar-fg: #c8c9db;
+  --sidebar-active: #ffb454;
+  --border: hsl(210, 25%, 13%);
+  --links: #0096cf;
+  --inline-code-color: #ffb454;
+  --code-bg: #191f26;
+  --code-fg: #c5c5c5;
+  --accent-note: #74b9ff;
+  --accent-tip: #09ca09;
+  --accent-important: #d3abff;
+  --accent-warning: #f0b72f;
+  --accent-caution: #f21424;
+}
+
+/* ---- derived tones (resolve against the active palette) ------------------- */
+
+:root {
+  --fy-sidebar-width: 18.75rem;
+  --paper: var(--bg);
+  --heading: var(--ink);
+  --muted: color-mix(in srgb, var(--ink) 72%, var(--bg));
+  --accent: var(--links);
+  --link: var(--links);
+  --link-hover: var(--sidebar-active);
+  --error: var(--accent-caution);
+  --code-bg: #f6f7f6;
+  --code-fg: var(--ink);
+  --code-border: var(--border);
+  --inline-bg: color-mix(in srgb, var(--ink) 8%, var(--bg));
+  --inline-fg: var(--inline-code-color);
+  --box-accent: var(--accent-note);
+  --box-bg: color-mix(in srgb, var(--accent-note) 9%, var(--bg));
+  --box-border: color-mix(in srgb, var(--accent-note) 30%, var(--bg));
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "Noto Serif SC", "SimSun", "Times New Roman", serif;
+  font-size: 16px;
+  line-height: 1.75;
+}
+
+/* ---- index page ---------------------------------------------------------- */
+
+.fy-index {
+  max-width: 42rem;
+  margin: 0 auto;
+  width: 100%;
+  padding: 10vh 24px 64px;
+}
+
+.fy-index-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+.fy-brand {
+  font-family: "Source Code Pro", "Cascadia Code", Consolas, monospace;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--heading);
+  text-decoration: none;
+}
+
+.fy-sub { color: var(--muted); }
+
+.fy-doc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.doc-link,
+.fy-card {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  padding: 16px 20px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.15s ease;
+}
+.doc-link:hover,
+.fy-card:hover { border-color: var(--links); }
+
+.doc-name,
+.fy-card-name {
+  font-family: "Source Code Pro", "Cascadia Code", Consolas, monospace;
+  font-weight: 700;
+  color: var(--heading);
+}
+
+.doc-title,
+.fy-card-title {
+  flex: 1;
+  color: var(--muted);
+  font-size: 0.9em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.doc-status,
+.fy-card-state {
+  font-size: 0.75rem;
+  font-family: "Source Code Pro", Consolas, monospace;
+}
+.doc-status.ok, .fy-card-state.ok { color: var(--accent-tip); }
+.doc-status.failed, .fy-card-state.failed { color: var(--error); }
+
+/* ---- viewer shell --------------------------------------------------------- */
+
+.fy-shell { min-height: 100vh; display: flex; flex-direction: column; }
+
+/* ---- sidebar controls and theme palette ----------------------------------- */
+
+.fy-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.fy-icon-btn:hover {
+  background: color-mix(in srgb, var(--ink) 8%, var(--bg));
+  color: var(--links);
+}
+
+.fy-topbar {
+  position: fixed;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 40;
+  display: grid;
+  grid-template-columns: 1fr minmax(0, 820px) 1fr;
+  align-items: center;
+  height: 48px;
+  padding: 0 18px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  transition: left 0.15s ease;
+}
+.fy-shell.fy-sidebar-open .fy-topbar { left: var(--fy-sidebar-width); }
+.fy-toolbar-left, .fy-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.fy-toolbar-right { justify-content: flex-end; }
+.fy-toolbar-title {
+  overflow: hidden;
+  color: var(--muted);
+  font-family: "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  font-size: 1.15rem;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fy-theme-wrap, .fy-search-wrap { position: relative; }
+
+.fy-theme-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 45;
+  min-width: 10.5rem;
+  padding: 6px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 18%);
+}
+.fy-theme-menu button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.85rem;
+  text-align: left;
+  cursor: pointer;
+}
+.fy-theme-menu button:hover {
+  background: color-mix(in srgb, var(--ink) 8%, var(--bg));
+}
+.fy-theme-menu button[aria-checked="true"] {
+  color: var(--sidebar-active);
+  font-weight: 700;
+}
+.fy-theme-menu button[aria-checked="true"]::after { content: "✓"; }
+
+.fy-search-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 45;
+  width: min(24rem, calc(100vw - 36px));
+  padding: 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 18%);
+}
+.fy-search-panel label { display: block; margin-bottom: 6px; font-size: 0.8rem; color: var(--muted); }
+.fy-search-panel input {
+  width: 100%;
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+}
+.fy-search-results { max-height: 17rem; margin-top: 8px; overflow-y: auto; }
+.fy-search-result {
+  display: block;
+  width: 100%;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.84rem;
+  text-align: left;
+  cursor: pointer;
+}
+.fy-search-result:hover { background: color-mix(in srgb, var(--ink) 8%, var(--bg)); }
+.fy-search-empty { margin: 8px 0 0; color: var(--muted); font-size: 0.84rem; }
+.fy-github-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  color: var(--muted);
+}
+.fy-github-link:hover { color: var(--links); }
+
+.fy-columns { display: flex; flex: 1; align-items: stretch; min-height: 100vh; }
+
+.fy-sidebar {
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  width: var(--fy-sidebar-width);
+  flex-shrink: 0;
+  height: 100vh;
+  overflow-y: scroll;
+  scrollbar-gutter: stable;
+  padding: 16px;
+  background: var(--sidebar-bg);
+  border-right: 1px solid var(--border);
+  display: none;
+}
+.fy-columns.fy-sidebar-open .fy-sidebar { display: block; }
+
+.fy-sidebar-resize {
+  display: none;
+  width: 8px;
+  flex: 0 0 8px;
+  margin-right: -4px;
+  margin-left: -4px;
+  cursor: col-resize;
+  touch-action: none;
+  z-index: 35;
+}
+.fy-columns.fy-sidebar-open .fy-sidebar-resize { display: block; }
+.fy-sidebar-resize::after {
+  display: block;
+  width: 2px;
+  height: 100%;
+  margin: 0 auto;
+  background: transparent;
+  content: "";
+  transition: background 0.15s ease;
+}
+.fy-sidebar-resize:hover::after,
+.fy-sidebar-resize:focus-visible::after,
+.fy-shell.fy-sidebar-resizing .fy-sidebar-resize::after {
+  background: var(--links);
+}
+.fy-shell.fy-sidebar-resizing,
+.fy-shell.fy-sidebar-resizing * { cursor: col-resize !important; user-select: none; }
+
+.fy-sidebar-brand {
+  margin: 2px 0 20px;
+  color: var(--sidebar-fg);
+  font-family: "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  font-size: 0.95rem;
+}
+
+.fy-scrim { display: none; }
+@media (max-width: 1023px) {
+  .fy-shell.fy-sidebar-open .fy-topbar { left: 0; }
+  .fy-toolbar-title { display: none; }
+  .fy-columns.fy-sidebar-open { position: relative; }
+  .fy-columns.fy-sidebar-open .fy-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 30;
+    width: min(18rem, 86vw);
+    box-shadow: 8px 0 28px rgb(0 0 0 / 25%);
+  }
+  .fy-sidebar-resize { display: none !important; }
+  .fy-columns.fy-sidebar-open .fy-scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 25;
+    background: rgb(0 0 0 / 45%);
+  }
+}
+
+.fy-sidebar-title {
+  font-family: "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--sidebar-fg);
+  margin-bottom: 8px;
+}
+
+.fy-content {
+  flex: 1;
+  min-width: 0;
+  height: 100vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.fy-page {
+  max-width: 820px;
+  margin: 0 auto;
+  min-height: 100%;
+  padding: 88px 32px 96px;
+  background: var(--paper);
+}
+
+/* ---- document page -------------------------------------------------------- */
+
+.fy-doc h1, .fy-doc h2, .fy-doc h3, .fy-doc h4 {
+  font-family: "Noto Sans SC", "Microsoft YaHei", "Arial", sans-serif;
+  color: var(--heading);
+  line-height: 1.4;
+}
+
+.fy-doc h1 {
+  font-size: 1.7em;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 10px;
+  margin-top: 2.2em;
+}
+
+.fy-doc h2 {
+  font-size: 1.3em;
+  margin-top: 2em;
+}
+
+.fy-doc h3 { font-size: 1.1em; }
+
+.fy-doc a { color: var(--links); }
+.fy-doc a:hover { color: var(--sidebar-active); }
+
+.fy-doc code {
+  font-family: "Source Code Pro", "Cascadia Code", Consolas, monospace;
+  font-size: 0.85em;
+  background: var(--inline-bg);
+  color: var(--inline-fg);
+  padding: 2px 5px;
+  border-radius: 4px;
+}
+
+.fy-doc pre {
+  background: var(--code-bg);
+  border: 1px solid var(--code-border);
+  border-radius: 6px;
+  padding: 12px 16px;
+  overflow-x: auto;
+}
+
+.fy-doc pre code {
+  background: none;
+  padding: 0;
+  font-size: 0.82em;
+}
+
+.fy-doc blockquote {
+  border-left: 3px solid var(--border);
+  margin: 1em 0;
+  padding: 2px 18px;
+  color: var(--muted);
+}
+
+/* typst emits the toc as a nav; on this page it reads as a toc card. */
+.fy-doc nav[role="doc-toc"] {
+  background: var(--code-bg);
+  border: 1px solid var(--code-border);
+  border-radius: 8px;
+  padding: 16px 24px;
+  font-size: 0.92em;
+}
+.fy-doc nav[role="doc-toc"] a { text-decoration: none; }
+.fy-doc nav[role="doc-toc"] a:hover { text-decoration: underline; }
+
+/* ---- fy-spec component contract ------------------------------------------ */
+/* Box families inherit the mdBook blockquote accents of the active palette;
+   surfaces are mixed against the page background. */
+
+.fy-box {
+  --box-accent: var(--accent-note);
+  border-left: 3.5px solid var(--box-accent);
+  border-top: 1px solid color-mix(in srgb, var(--box-accent) 30%, var(--bg));
+  border-right: 1px solid color-mix(in srgb, var(--box-accent) 30%, var(--bg));
+  border-bottom: 1px solid color-mix(in srgb, var(--box-accent) 30%, var(--bg));
+  background: color-mix(in srgb, var(--box-accent) 9%, var(--bg));
+  border-radius: 0 6px 6px 0;
+  padding: 10px 16px;
+  margin: 1.2em 0;
+}
+
+.fy-box.fy-contract { --box-accent: var(--accent-tip); }
+.fy-box.fy-invariant { --box-accent: var(--accent-warning); }
+.fy-box.fy-example { --box-accent: var(--accent-important); }
+
+.fy-box-title {
+  display: block;
+  font-family: "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  font-weight: 700;
+  font-size: 0.82em;
+  color: var(--box-accent);
+  margin-bottom: 4px;
+}
+
+.fy-badge {
+  display: inline-block;
+  font-family: "Source Code Pro", Consolas, monospace;
+  font-size: 0.72em;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 5px;
+  color: var(--accent-note);
+  border: 1px solid color-mix(in srgb, var(--accent-note) 40%, var(--bg));
+  background: color-mix(in srgb, var(--accent-note) 10%, var(--bg));
+}
+.fy-badge.fy-badge-pending {
+  color: var(--accent-warning);
+  border-color: color-mix(in srgb, var(--accent-warning) 40%, var(--bg));
+  background: color-mix(in srgb, var(--accent-warning) 10%, var(--bg));
+}
+
+/* The document sits inside the viewer shell and keeps only its typography. */
+.fy-doc-embedded {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  min-height: 0;
+}
+
+/* The viewer keeps one Typst top-level chapter visible at a time. */
+.fy-chapter { display: none; }
+.fy-chapter.fy-chapter-active { display: block; }
+.fy-chapter > :first-child { margin-top: 0; }
+
+.fy-pager {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+  margin-top: 48px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+.fy-pager-link {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 7px;
+  color: var(--links);
+  text-decoration: none;
+}
+.fy-pager-link:hover { background: color-mix(in srgb, var(--ink) 7%, var(--bg)); }
+.fy-pager-prev { text-align: left; }
+.fy-pager-next { text-align: right; }
+.fy-pager-label { font-size: 0.75rem; color: var(--muted); }
+.fy-pager-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fy-pager-pos { color: var(--muted); font-size: 0.8rem; white-space: nowrap; }
+.fy-pager-hidden { visibility: hidden; pointer-events: none; }
+.fy-toc-active { color: var(--sidebar-active) !important; font-weight: 700; }
+
+@media (max-width: 640px) {
+  .fy-page { padding: 72px 18px 64px; }
+  .fy-pager { gap: 8px; }
+  .fy-pager-pos { display: none; }
+  .fy-pager { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+}
+
+/* Sidebar toc (the nav node is moved here by the viewer). */
+.fy-sidebar nav[role="doc-toc"] {
+  font-size: 0.86em;
+  color: var(--sidebar-fg);
+}
+.fy-sidebar nav[role="doc-toc"] ol {
+  list-style: none;
+  margin: 0;
+  padding-left: 0.9em;
+}
+.fy-sidebar nav[role="doc-toc"] a {
+  display: block;
+  padding: 3px 8px;
+  border-radius: 5px;
+  text-decoration: none;
+  color: var(--sidebar-fg);
+}
+.fy-sidebar nav[role="doc-toc"] a:hover {
+  background: color-mix(in srgb, var(--sidebar-fg) 12%, var(--sidebar-bg));
+  color: var(--sidebar-active);
+}
+/* ---- error page ----------------------------------------------------------- */
+
+.fy-error h1 { color: var(--error); border-bottom-color: var(--error); }
+.fy-error pre {
+  color: var(--ink);
+  font-size: 0.82em;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.fy-error-hint { color: var(--muted); font-size: 0.9em; }
+
+.fy-index-head .flex-1 { flex: 1; }
+.fy-index-head .fy-theme-select { flex-shrink: 0; }
+
+@media print {
+  .fy-topbar, .fy-sidebar, .fy-pager { display: none !important; }
+  .fy-content { height: auto; overflow: visible; }
+  .fy-page { max-width: none; min-height: 0; padding: 0; }
+  .fy-chapter { display: none; }
+  .fy-chapter.fy-chapter-active { display: block; }
+}

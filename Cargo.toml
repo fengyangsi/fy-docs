@@ -1,0 +1,29 @@
+[package]
+name = "fy-docs"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+authors = ["fengyangsi"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/fengyangsi/fy-docs"
+homepage = "https://github.com/fengyangsi/fy-docs"
+documentation = "https://docs.rs/fy-docs"
+readme = "README.md"
+description = "Cargo subcommand for building and previewing Typst specification documents"
+keywords = ["typst", "documentation", "cargo-subcommand", "docs"]
+categories = ["command-line-utilities", "development-tools::cargo-plugins"]
+include = ["/src/**", "/assets/**", "/fy-spec/lib.typ", "/docs/main.typ", "/docs/modules/**", "/Cargo.toml", "/Cargo.lock", "/README.md", "/README.zh-CN.md", "/CHANGELOG.md", "/CHANGELOG.zh-CN.md", "/LICENSE-APACHE", "/LICENSE-MIT"]
+
+[[bin]]
+name = "cargo-fy-docs"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+axum = "0.8"
+clap = { version = "4", features = ["derive"] }
+notify = "8"
+open = "5"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "signal"] }
+toml = "1"
+tower-http = { version = "0.6", features = ["fs"] }

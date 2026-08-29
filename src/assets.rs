@@ -1,0 +1,143 @@
+//! Page template and bundled assets for the generated static page.
+
+const DOC_TEMPLATE: &str = include_str!("../assets/doc.html");
+pub const BASE_CSS: &str = include_str!("../assets/base.css");
+pub const VIEWER_JS: &str = include_str!("../assets/viewer.js");
+/// Shipped with `build` output: a no-op so `file://` pages stay silent.
+pub const POLL_STUB: &str =
+    "/* fy-docs: live reload is only provided by `cargo fy-docs serve`. */\n";
+/// Served instead of the stub when running as a server.
+pub const POLL_REAL: &str = include_str!("../assets/poll.js");
+
+pub(crate) struct UiText {
+    pub language: &'static str,
+    pub sidebar_toggle: &'static str,
+    pub theme: &'static str,
+    pub system_theme: &'static str,
+    pub search: &'static str,
+    pub search_document: &'static str,
+    pub search_placeholder: &'static str,
+    pub print: &'static str,
+    pub table_of_contents: &'static str,
+    pub github: &'static str,
+    pub compile_failed: &'static str,
+    pub compile_failed_detail: &'static str,
+    pub compile_failed_hint: &'static str,
+}
+
+pub(crate) fn ui_text(title: &str, body: &str) -> UiText {
+    let chinese = title
+        .chars()
+        .chain(body.chars())
+        .any(|character| ('\u{4e00}'..='\u{9fff}').contains(&character));
+    if chinese {
+        UiText {
+            language: "zh-CN",
+            sidebar_toggle: "目录侧栏",
+            theme: "主题",
+            system_theme: "跟随系统",
+            search: "搜索",
+            search_document: "搜索文档",
+            search_placeholder: "输入关键词",
+            print: "打印当前章节",
+            table_of_contents: "目录",
+            github: "GitHub 仓库",
+            compile_failed: "编译失败",
+            compile_failed_detail: "typst 编译未能通过，输出如下：",
+            compile_failed_hint: "修正源码并保存后，本页会在下次编译完成时自动更新。",
+        }
+    } else {
+        UiText {
+            language: "en",
+            sidebar_toggle: "Toggle sidebar",
+            theme: "Theme",
+            system_theme: "System preference",
+            search: "Search",
+            search_document: "Search documentation",
+            search_placeholder: "Enter keywords",
+            print: "Print current chapter",
+            table_of_contents: "Table of contents",
+            github: "GitHub repository",
+            compile_failed: "Compilation failed",
+            compile_failed_detail: "typst compilation failed with the following output:",
+            compile_failed_hint: "Fix the source and save; this page will update automatically on the next successful build.",
+        }
+    }
+}
+
+/// Renders the generated page. The Typst body is already trimmed; GitHub is
+/// linked only when the package declares that repository.
+pub fn doc_page(title: &str, name: &str, repository: Option<&str>, body: &str) -> String {
+    let ui = ui_text(title, body);
+    let github_link = repository.map_or_else(String::new, |url| {
+        format!(
+            r#"<a class="fy-github-link" href="{}" title="{}" aria-label="{}"><svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-3.2 19.5c.5.1.7-.2.7-.5v-1.8c-2.8.6-3.4-1.2-3.4-1.2-.5-1.2-1.1-1.5-1.1-1.5-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.5 2.4 1.1 3 .8.1-.6.4-1.1.7-1.3-2.2-.2-4.6-1.1-4.6-5a3.9 3.9 0 0 1 1-2.7c-.1-.3-.4-1.3.1-2.7 0 0 .8-.3 2.8 1.1a9.7 9.7 0 0 1 5 0c2-1.4 2.8-1.1 2.8-1.1.5 1.4.2 2.4.1 2.7a3.9 3.9 0 0 1 1 2.7c0 3.9-2.4 4.7-4.6 5 .4.3.7 1 .7 1.9V21c0 .3.2.6.7.5A10 10 0 0 0 12 2Z"/></svg></a>"#,
+            escape_attribute(url),
+            ui.github,
+            ui.github,
+        )
+    });
+    DOC_TEMPLATE
+        .replace("{{TITLE}}", &escape(title))
+        .replace("{{NAME}}", &escape(name))
+        .replace("{{LANG}}", ui.language)
+        .replace("{{SIDEBAR_TOGGLE}}", ui.sidebar_toggle)
+        .replace("{{THEME}}", ui.theme)
+        .replace("{{SYSTEM_THEME}}", ui.system_theme)
+        .replace("{{SEARCH}}", ui.search)
+        .replace("{{SEARCH_DOCUMENT}}", ui.search_document)
+        .replace("{{SEARCH_PLACEHOLDER}}", ui.search_placeholder)
+        .replace("{{PRINT}}", ui.print)
+        .replace("{{TABLE_OF_CONTENTS}}", ui.table_of_contents)
+        .replace("{{GITHUB_LINK}}", &github_link)
+        .replace("{{BODY}}", body)
+}
+
+pub(crate) fn escape(text: &str) -> String {
+    text.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+}
+
+fn escape_attribute(text: &str) -> String {
+    escape(text).replace('"', "&quot;")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fills_all_tokens() {
+        let page = doc_page(
+            "T & <T>",
+            "fy-x",
+            Some("https://github.com/fengyangsi/fy-docs"),
+            "<h1>hi</h1>",
+        );
+        assert!(page.contains("<title>T &amp; &lt;T&gt; · fy-docs</title>"));
+        assert!(page.contains("<html lang=\"en\">"));
+        assert!(page.contains("title=\"Theme\""));
+        assert!(page.contains("https://github.com/fengyangsi/fy-docs"));
+        assert!(page.contains("<h1>hi</h1>"));
+        assert!(page.contains("fy-theme-toggle"));
+        assert!(page.contains("fy-search-toggle"));
+        assert!(page.contains("fy-sidebar-resize"));
+        assert!(page.contains("fy-docs.js"));
+        assert!(page.contains("_poll.js"));
+        assert!(!page.contains("{{"));
+    }
+
+    #[test]
+    fn omits_github_link_without_a_repository() {
+        let page = doc_page("T", "fy-x", None, "<h1>hi</h1>");
+        assert!(!page.contains("fy-github-link"));
+    }
+
+    #[test]
+    fn localizes_controls_for_chinese_documents() {
+        let page = doc_page("中文文档", "fy-x", None, "<h1>内容</h1>");
+        assert!(page.contains("<html lang=\"zh-CN\">"));
+        assert!(page.contains("title=\"主题\""));
+    }
+}
