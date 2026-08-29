@@ -1,4 +1,4 @@
-#import "/fy-spec/lib.typ": *
+#import "../fy-spec/lib.typ": *
 
 = project 模块：项目探测与目录契约
 

@@ -1,4 +1,4 @@
-#import "/fy-spec/lib.typ": *
+#import "../fy-spec/lib.typ": *
 
 = compiler 模块：Typst 构建与交付物
 

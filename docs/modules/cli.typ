@@ -1,4 +1,4 @@
-#import "/fy-spec/lib.typ": *
+#import "../fy-spec/lib.typ": *
 
 = cli 模块：Cargo 外部子命令
 

@@ -2,20 +2,27 @@
 
 [English](CHANGELOG.md) | 简体中文
 
-本项目的所有重要变更都会记录在此文件中。
+本项目的全部重要变更都会记录在此文件中。
 
-本日志格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
-并且本项目遵循 [语义化版本 2.0.0](https://semver.org/lang/zh-CN/)。
+格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
+版本遵循 [语义化版本 2.0.0](https://semver.org/lang/zh-CN/)。
+
+## [0.1.1] - 2026-08-30
+
+### 变更
+- 规范化 `docs/` 模板导入为相对路径（`fy-spec/lib.typ` 与 `../fy-spec/lib.typ`），使各项目规格文档完全自包含，在 IDE（如 VSCode / Tinymist）中单文件打开时无需配置全局根路径。
+- 更新 `Cargo.toml` 打包清单 `include` 列表，包含本地 `docs/fy-spec/lib.typ`。
+- 去除并精炼了 `docs/modules/viewer.typ` 中重复冗余的交互契约条目。
 
 ## [0.1.0] - 2026-08-29
 
-### 新增 (Added)
-- `cargo fy-docs` 交互式预览服务器（基于 Axum），支持监听 `.typ` 文件变更并实时热重载。
-- `cargo fy-docs init` 子命令，用于脚手架初始化 `docs/` 目录、起始 `main.typ` 入口及内置的 `fy-spec` 模板。
-- `cargo fy-docs build` 子命令，用于在 `docs/target/` 目录下生成离线静态 HTML 阅读页。
-- `cargo fy-docs pdf` 子命令，用于在 `docs/release/` 目录下编译打印版 ISO B5 规格书 PDF。
-- 基于绝对路径 `#import` 语句自动推断并定位 Typst 编译根目录（Compile Root）。
-- 支持继承并解析 Cargo Workspace 清单中的包元数据。
-- 6 种文档主题配色（Light、Rust、Coal、Navy、Ayu、跟随系统偏好）。
-- 可拖拽调节宽度的目录侧边栏、按章节独立翻页阅读与文档内即时搜索。
-- 双语错误提示页与界面本地化支持（英文 / 简体中文自动切换）。
+### 新增
+- `cargo fy-docs` 基于 Axum 的交互式实时预览服务，支持 `.typ` 源码变更热重载。
+- `cargo fy-docs init` 初始化脚手架子命令，快速创建包含 `main.typ` 与内嵌 `fy-spec` 模板的 `docs/` 目录。
+- `cargo fy-docs build` 静态 HTML 离线生成子命令，输出至 `docs/target/`。
+- `cargo fy-docs pdf` ISO B5 打印版 PDF 编译子命令，输出至 `docs/release/`。
+- 基于绝对导入路径的 Typst 编译根目录自动探测。
+- Cargo workspace 包元数据继承支持。
+- 六款文档主题切换（Light, Rust, Coal, Navy, Ayu, 跟随系统）。
+- 可调节宽度的响应式侧边栏，支持目录导航、按章分页与全文搜索。
+- 中英文双语错误页与阅读器界面本地化。

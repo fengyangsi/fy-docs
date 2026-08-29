@@ -1,4 +1,4 @@
-#import "/fy-spec/lib.typ": *
+#import "../fy-spec/lib.typ": *
 
 = server 模块：本地服务与增量刷新
 

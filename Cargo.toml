@@ -1,6 +1,6 @@
 [package]
 name = "fy-docs"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 rust-version = "1.85"
 authors = ["fengyangsi"]
@@ -12,7 +12,7 @@ readme = "README.md"
 description = "Cargo subcommand for building and previewing Typst specification documents"
 keywords = ["typst", "documentation", "cargo-subcommand", "docs"]
 categories = ["command-line-utilities", "development-tools::cargo-plugins"]
-include = ["/src/**", "/assets/**", "/fy-spec/lib.typ", "/docs/main.typ", "/docs/modules/**", "/Cargo.toml", "/Cargo.lock", "/README.md", "/README.zh-CN.md", "/CHANGELOG.md", "/CHANGELOG.zh-CN.md", "/LICENSE-APACHE", "/LICENSE-MIT"]
+include = ["/src/**", "/assets/**", "/fy-spec/lib.typ", "/docs/main.typ", "/docs/fy-spec/lib.typ", "/docs/modules/**", "/Cargo.toml", "/Cargo.lock", "/README.md", "/README.zh-CN.md", "/CHANGELOG.md", "/CHANGELOG.zh-CN.md", "/LICENSE-APACHE", "/LICENSE-MIT"]
 
 [[bin]]
 name = "cargo-fy-docs"
