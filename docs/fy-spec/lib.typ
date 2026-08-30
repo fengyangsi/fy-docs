@@ -115,10 +115,10 @@
   let labels = if is-zh {
     (
       edition: "规格说明书 · ISO B5 典藏版",
-      version: "版本 (Version):",
-      author: "作者 (Author):",
-      date: "构建日期 (Date):",
-      methodology: "核心范式 (Methodology):",
+      version: "版本:",
+      author: "作者:",
+      date: "构建日期:",
+      methodology: "核心范式:",
       toc: "目 录",
     )
   } else {
@@ -364,7 +364,7 @@
 
 #let contract(body, title: auto) = context {
   let is-zh = text.lang == "zh"
-  let default-title = if is-zh { "强类型接口与规格契约 (Contract)" } else { "Interface Contract" }
+  let default-title = if is-zh { "强类型接口与规格契约" } else { "Interface Contract" }
   let effective-title = if title == auto { default-title } else { title }
   callout(
     body,
@@ -379,7 +379,7 @@
 
 #let invariant(body, title: auto) = context {
   let is-zh = text.lang == "zh"
-  let default-title = if is-zh { "核心不变性与安全约束 (Invariant)" } else { "Core Invariant" }
+  let default-title = if is-zh { "核心不变性与安全约束" } else { "Core Invariant" }
   let effective-title = if title == auto { default-title } else { title }
   callout(
     body,
@@ -394,7 +394,7 @@
 
 #let logic-box(body, title: auto) = context {
   let is-zh = text.lang == "zh"
-  let default-title = if is-zh { "形式逻辑与推理规则 (Logical Rules)" } else { "Logical Rules" }
+  let default-title = if is-zh { "形式逻辑与推理规则" } else { "Logical Rules" }
   let effective-title = if title == auto { default-title } else { title }
   callout(
     body,
@@ -406,7 +406,7 @@
 
 #let proof-box(body, title: auto) = context {
   let is-zh = text.lang == "zh"
-  let default-title = if is-zh { "证明策略与启发式搜索 (Proof Strategy)" } else { "Proof Strategy" }
+  let default-title = if is-zh { "证明策略与启发式搜索" } else { "Proof Strategy" }
   let effective-title = if title == auto { default-title } else { title }
   callout(
     body,
@@ -418,7 +418,7 @@
 
 #let math-box(body, title: auto) = context {
   let is-zh = text.lang == "zh"
-  let default-title = if is-zh { "数学推导与数值模型 (Mathematical Model)" } else { "Mathematical Model" }
+  let default-title = if is-zh { "数学推导与数值模型" } else { "Mathematical Model" }
   let effective-title = if title == auto { default-title } else { title }
   callout(
     body,
@@ -430,7 +430,7 @@
 
 #let geom-box(body, title: auto) = context {
   let is-zh = text.lang == "zh"
-  let default-title = if is-zh { "几何结构与空间模型 (Geometry Model)" } else { "Geometry Model" }
+  let default-title = if is-zh { "几何结构与空间模型" } else { "Geometry Model" }
   let effective-title = if title == auto { default-title } else { title }
   callout(
     body,
@@ -442,7 +442,7 @@
 
 #let axiom-box(body, title: auto) = context {
   let is-zh = text.lang == "zh"
-  let default-title = if is-zh { "几何公理与推演法则 (Geometric Axiom)" } else { "Geometric Axiom" }
+  let default-title = if is-zh { "几何公理与推演法则" } else { "Geometric Axiom" }
   let effective-title = if title == auto { default-title } else { title }
   callout(
     body,
@@ -454,7 +454,7 @@
 
 #let motion-box(body, title: auto) = context {
   let is-zh = text.lang == "zh"
-  let default-title = if is-zh { "运动学模型与时序法则 (Motion Model)" } else { "Motion Model" }
+  let default-title = if is-zh { "运动学模型与时序法则" } else { "Motion Model" }
   let effective-title = if title == auto { default-title } else { title }
   callout(
     body,
@@ -466,7 +466,7 @@
 
 #let example-box(body, title: auto) = context {
   let is-zh = text.lang == "zh"
-  let default-title = if is-zh { "规格用例与状态验证 (Example & Verification)" } else { "Specification Example" }
+  let default-title = if is-zh { "规格用例与状态验证" } else { "Specification Example" }
   let effective-title = if title == auto { default-title } else { title }
   callout(
     body,
