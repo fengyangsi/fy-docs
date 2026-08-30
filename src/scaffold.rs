@@ -43,7 +43,14 @@ pub fn init(cwd: &Path) -> Result<()> {
         );
     }
 
-    let (name, version, author) = read_cargo_meta(cwd);
+    let meta = crate::project::cargo_package_meta(cwd);
+    let name = meta.name.unwrap_or_else(|| {
+        cwd.file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_else(|| "project".to_owned())
+    });
+    let version = meta.version.unwrap_or_else(|| "0.1.0".to_owned());
+    let author = meta.author.unwrap_or_else(|| "TODO".to_owned());
 
     // Create directory structure.
     fs::create_dir_all(docs_dir.join("modules")).context("could not create docs/modules/")?;
@@ -61,7 +68,7 @@ pub fn init(cwd: &Path) -> Result<()> {
     fs::write(&entry, main_content).context("could not write docs/main.typ")?;
 
     // Ensure .gitignore has the generated directories.
-    ensure_gitignore(cwd, &["/docs/target/", "/docs/release/"]);
+    crate::project::ensure_gitignore(cwd, &["/docs/target/", "/docs/release/"]);
 
     crate::state::log(&format!(
         "[fy-docs] initialized {}",
@@ -74,64 +81,46 @@ pub fn init(cwd: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Reads `[package] name`, `version` and the first `authors` entry from
-/// `Cargo.toml`, falling back to the directory name, `"0.1.0"` and `"TODO"`.
-fn read_cargo_meta(cwd: &Path) -> (String, String, String) {
-    let fallback_name = cwd
-        .file_name()
-        .map(|n| n.to_string_lossy().into_owned())
-        .unwrap_or_else(|| "project".to_owned());
-
-    let Ok(text) = fs::read_to_string(cwd.join("Cargo.toml")) else {
-        return (fallback_name, "0.1.0".to_owned(), "TODO".to_owned());
-    };
-    let Ok(manifest) = text.parse::<toml::Table>() else {
-        return (fallback_name, "0.1.0".to_owned(), "TODO".to_owned());
-    };
-    let package = manifest.get("package").and_then(toml::Value::as_table);
-    let name = package
-        .and_then(|p| p.get("name"))
-        .and_then(toml::Value::as_str)
-        .map(str::to_owned)
-        .unwrap_or(fallback_name);
-    let version = package
-        .and_then(|p| p.get("version"))
-        .and_then(toml::Value::as_str)
-        .map(str::to_owned)
-        .unwrap_or_else(|| "0.1.0".to_owned());
-    let author = package
-        .and_then(|p| p.get("authors"))
-        .and_then(toml::Value::as_array)
-        .and_then(|authors| authors.first())
-        .and_then(toml::Value::as_str)
-        .map(str::to_owned)
-        .unwrap_or_else(|| "TODO".to_owned());
-    (name, version, author)
-}
-
-/// Appends entries to `.gitignore` if they are not already present.
-fn ensure_gitignore(cwd: &Path, entries: &[&str]) {
-    let gitignore = cwd.join(".gitignore");
-    let mut content = fs::read_to_string(&gitignore).unwrap_or_default();
-    let mut changed = false;
-    for &entry in entries {
-        if !content.lines().any(|line| line.trim() == entry) {
-            if !content.is_empty() && !content.ends_with('\n') {
-                content.push('\n');
-            }
-            content.push_str(entry);
-            content.push('\n');
-            changed = true;
-        }
+/// Writes (or, with `check`, only verifies) the embedded fy-spec template at
+/// `docs/fy-spec/lib.typ`, keeping every project on the template version
+/// shipped with the installed fy-docs binary. Needs no typst binary.
+pub fn vendor(cwd: &Path, check: bool) -> Result<()> {
+    let docs_dir = cwd.join("docs");
+    if !docs_dir.is_dir() {
+        bail!(
+            "`{}` has no docs/ directory — run `cargo fy-docs init` first",
+            crate::state::display_path(&docs_dir)
+        );
     }
-    if changed {
-        if let Err(err) = fs::write(&gitignore, content) {
-            crate::state::log(&format!(
-                "[fy-docs] could not update {}: {err}",
-                gitignore.display()
-            ));
+    let lib = docs_dir.join("fy-spec").join("lib.typ");
+
+    if check {
+        let current = fs::read_to_string(&lib).with_context(|| {
+            format!(
+                "{} is missing — run `cargo fy-docs vendor` to sync it",
+                crate::state::display_path(&lib)
+            )
+        })?;
+        if current != TEMPLATE_LIB {
+            bail!(
+                "{} differs from the embedded template — run `cargo fy-docs vendor` to sync it",
+                crate::state::display_path(&lib)
+            );
         }
+        crate::state::log(&format!(
+            "[fy-docs] {} matches the embedded template",
+            crate::state::display_path(&lib)
+        ));
+        return Ok(());
     }
+
+    fs::create_dir_all(docs_dir.join("fy-spec")).context("could not create docs/fy-spec/")?;
+    fs::write(&lib, TEMPLATE_LIB).context("could not write docs/fy-spec/lib.typ")?;
+    crate::state::log(&format!(
+        "[fy-docs] vendored fy-spec into {}",
+        crate::state::display_path(&lib)
+    ));
+    Ok(())
 }
 
 #[cfg(test)]
@@ -187,6 +176,35 @@ mod tests {
         let main = std::fs::read_to_string(temp.join("docs/main.typ")).unwrap();
         assert!(main.contains("0.1.0"));
         assert!(main.contains(r#"author: "TODO""#));
+
+        std::fs::remove_dir_all(temp).unwrap();
+    }
+
+    #[test]
+    fn vendor_syncs_and_checks_the_template() {
+        let temp = std::env::temp_dir().join(format!("fy-docs-vendor-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&temp);
+        std::fs::create_dir_all(&temp).unwrap();
+
+        // Without a docs/ directory vendor refuses and points at init.
+        assert!(vendor(&temp, false).is_err());
+
+        init(&temp).unwrap();
+        assert!(vendor(&temp, true).is_ok());
+
+        // A drifted or missing copy fails --check and is repaired by vendor.
+        std::fs::write(temp.join("docs/fy-spec/lib.typ"), "drifted").unwrap();
+        assert!(vendor(&temp, true).is_err());
+        vendor(&temp, false).unwrap();
+        assert!(vendor(&temp, true).is_ok());
+
+        std::fs::remove_file(temp.join("docs/fy-spec/lib.typ")).unwrap();
+        assert!(vendor(&temp, true).is_err());
+        vendor(&temp, false).unwrap();
+        assert_eq!(
+            std::fs::read_to_string(temp.join("docs/fy-spec/lib.typ")).unwrap(),
+            TEMPLATE_LIB
+        );
 
         std::fs::remove_dir_all(temp).unwrap();
     }

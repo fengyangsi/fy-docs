@@ -27,11 +27,16 @@ pub(crate) struct UiText {
     pub compile_failed_hint: &'static str,
 }
 
-pub(crate) fn ui_text(title: &str, body: &str) -> UiText {
-    let chinese = title
-        .chars()
-        .chain(body.chars())
-        .any(|character| ('\u{4e00}'..='\u{9fff}').contains(&character));
+/// Chooses the UI language from the document's declared language when a
+/// target is known; the fallback scans the body for CJK ideographs (used by
+/// default-language projects whose `lang` field is empty).
+pub(crate) fn ui_text(lang_hint: Option<&str>, body: &str) -> UiText {
+    let chinese = match lang_hint.filter(|hint| !hint.is_empty()) {
+        Some(lang) => lang.to_lowercase().starts_with("zh"),
+        None => body
+            .chars()
+            .any(|character| ('\u{4e00}'..='\u{9fff}').contains(&character)),
+    };
     if chinese {
         UiText {
             language: "zh-CN",
@@ -79,7 +84,7 @@ pub fn doc_page(
     current_target: Option<&LanguageTarget>,
     all_targets: &[LanguageTarget],
 ) -> String {
-    let ui = ui_text(title, body);
+    let ui = ui_text(current_target.map(|t| t.lang.as_str()), body);
     let github_link = repository.map_or_else(String::new, |url| {
         format!(
             r#"<a class="fy-github-link" href="{}" title="{}" aria-label="{}"><svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-3.2 19.5c.5.1.7-.2.7-.5v-1.8c-2.8.6-3.4-1.2-3.4-1.2-.5-1.2-1.1-1.5-1.1-1.5-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.5 2.4 1.1 3 .8.1-.6.4-1.1.7-1.3-2.2-.2-4.6-1.1-4.6-5a3.9 3.9 0 0 1 1-2.7c-.1-.3-.4-1.3.1-2.7 0 0 .8-.3 2.8 1.1a9.7 9.7 0 0 1 5 0c2-1.4 2.8-1.1 2.8-1.1.5 1.4.2 2.4.1 2.7a3.9 3.9 0 0 1 1 2.7c0 3.9-2.4 4.7-4.6 5 .4.3.7 1 .7 1.9V21c0 .3.2.6.7.5A10 10 0 0 0 12 2Z"/></svg></a>"#,
@@ -319,6 +324,31 @@ mod tests {
     fn localizes_controls_for_chinese_documents() {
         let page = doc_page("中文文档", "fy-x", None, "<h1>内容</h1>", None, &[]);
         assert!(page.contains("<html lang=\"zh-CN\">"));
+    }
+
+    #[test]
+    fn lang_hint_overrides_body_detection() {
+        let zh_target = LanguageTarget {
+            lang: "zh-CN".to_owned(),
+            display_name: "简体中文".to_owned(),
+            entry: std::path::PathBuf::from("docs/zh-CN/main.typ"),
+            html_file_name: "index_zh-CN.html".to_owned(),
+            pdf_file_name: "x.pdf".to_owned(),
+        };
+        // An English body under a zh-CN target still gets Chinese controls.
+        let page = doc_page("Doc", "fy-x", None, "<h1>hello</h1>", Some(&zh_target), &[]);
+        assert!(page.contains("<html lang=\"zh-CN\">"));
+
+        // A Japanese target must not be mistaken for Chinese by scanning.
+        let ja_target = LanguageTarget {
+            lang: "ja".to_owned(),
+            display_name: "日本語".to_owned(),
+            entry: std::path::PathBuf::from("docs/ja/main.typ"),
+            html_file_name: "index_ja.html".to_owned(),
+            pdf_file_name: "x.pdf".to_owned(),
+        };
+        let page = doc_page("文書", "fy-x", None, "<h1>こんにちは</h1>", Some(&ja_target), &[]);
+        assert!(page.contains("<html lang=\"en\">"));
     }
 
     #[test]

@@ -103,8 +103,8 @@ pub fn detect(cwd: &Path, root_override: Option<&Path>) -> Result<Project> {
         );
     }
 
-    let (cargo_name, cargo_version, repository) = cargo_package_info(cwd);
-    let name = cargo_name.unwrap_or_else(|| {
+    let meta = cargo_package_meta(cwd);
+    let name = meta.name.unwrap_or_else(|| {
         cwd.file_name()
             .map(|n| n.to_string_lossy().into_owned())
             .unwrap_or_else(|| "project".to_owned())
@@ -112,9 +112,10 @@ pub fn detect(cwd: &Path, root_override: Option<&Path>) -> Result<Project> {
 
     // Detect language targets within docs/
     let (targets, primary_entry) =
-        detect_language_targets(&docs_dir, &name, cargo_version.as_deref())?;
+        detect_language_targets(&docs_dir, &name, meta.version.as_deref())?;
 
-    let version = cargo_version
+    let version = meta
+        .version
         .unwrap_or_else(|| main_typ_version(&primary_entry).unwrap_or_else(|| "0.1.0".to_owned()));
 
     let imports = absolute_imports(&docs_dir);
@@ -141,7 +142,7 @@ pub fn detect(cwd: &Path, root_override: Option<&Path>) -> Result<Project> {
     Ok(Project {
         name,
         version,
-        repository,
+        repository: meta.repository,
         entry: primary_entry,
         targets,
         docs_dir,
@@ -300,20 +301,69 @@ fn collect_imports(dir: &Path, imports: &mut Vec<String>) {
     }
 }
 
-/// Reads `[package] name/version` from Cargo.toml, if present.
-fn cargo_package_info(cwd: &Path) -> (Option<String>, Option<String>, Option<String>) {
+/// Package metadata read from `Cargo.toml`, honoring `workspace = true`
+/// inheritance for scalar fields.
+#[derive(Debug, Default, PartialEq, Eq)]
+pub(crate) struct CargoMeta {
+    pub name: Option<String>,
+    pub version: Option<String>,
+    /// A GitHub repository URL, when the manifest declares one.
+    pub repository: Option<String>,
+    /// The first `authors` entry, when declared directly in the manifest.
+    pub author: Option<String>,
+}
+
+/// Reads `[package]` metadata from `Cargo.toml`, if present.
+pub(crate) fn cargo_package_meta(cwd: &Path) -> CargoMeta {
     let Ok(text) = std::fs::read_to_string(cwd.join("Cargo.toml")) else {
-        return (None, None, None);
+        return CargoMeta::default();
     };
     let Ok(manifest) = text.parse::<toml::Table>() else {
-        return (None, None, None);
+        return CargoMeta::default();
     };
     let Some(package) = manifest.get("package").and_then(toml::Value::as_table) else {
-        return (None, None, None);
+        return CargoMeta::default();
     };
     let value = |key| package_value(cwd, package, key);
     let repository = value("repository").filter(|url| is_github_repository(url));
-    (value("name"), value("version"), repository)
+    CargoMeta {
+        name: value("name"),
+        version: value("version"),
+        repository,
+        author: package
+            .get("authors")
+            .and_then(toml::Value::as_array)
+            .and_then(|authors| authors.first())
+            .and_then(toml::Value::as_str)
+            .map(str::to_owned),
+    }
+}
+
+/// Appends entries to the project's `.gitignore` when they are missing so
+/// generated directories stay untracked; write failures are logged, never
+/// fatal.
+pub(crate) fn ensure_gitignore(root: &Path, entries: &[&str]) {
+    let gitignore = root.join(".gitignore");
+    let mut content = std::fs::read_to_string(&gitignore).unwrap_or_default();
+    let mut changed = false;
+    for entry in entries {
+        if !content.lines().any(|line| line.trim() == *entry) {
+            if !content.is_empty() && !content.ends_with('\n') {
+                content.push('\n');
+            }
+            content.push_str(entry);
+            content.push('\n');
+            changed = true;
+        }
+    }
+    if changed
+        && let Err(err) = std::fs::write(&gitignore, content)
+    {
+        crate::state::log(&format!(
+            "[fy-docs] could not update {}: {err}",
+            gitignore.display()
+        ));
+    }
 }
 
 fn is_github_repository(url: &str) -> bool {
@@ -402,14 +452,33 @@ mod tests {
         std::fs::create_dir_all(&temp).unwrap();
         std::fs::write(
             temp.join("Cargo.toml"),
-            "[package]\nname = \"demo\"\nversion = \"1.2.3\"\nrepository = \"https://github.com/org/repo\"\n",
+            "[package]\nname = \"demo\"\nversion = \"1.2.3\"\nrepository = \"https://github.com/org/repo\"\nauthors = [\"Tester <t@example.com>\"]\n",
         )
         .unwrap();
 
-        let (name, version, repo) = cargo_package_info(&temp);
-        assert_eq!(name.as_deref(), Some("demo"));
-        assert_eq!(version.as_deref(), Some("1.2.3"));
-        assert_eq!(repo.as_deref(), Some("https://github.com/org/repo"));
+        let meta = cargo_package_meta(&temp);
+        assert_eq!(meta.name.as_deref(), Some("demo"));
+        assert_eq!(meta.version.as_deref(), Some("1.2.3"));
+        assert_eq!(
+            meta.repository.as_deref(),
+            Some("https://github.com/org/repo")
+        );
+        assert_eq!(meta.author.as_deref(), Some("Tester <t@example.com>"));
+        let _ = std::fs::remove_dir_all(&temp);
+    }
+
+    #[test]
+    fn gitignore_entries_are_added_once() {
+        let temp = std::env::temp_dir().join(format!("fy-docs-ign-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&temp);
+        std::fs::create_dir_all(&temp).unwrap();
+        std::fs::write(temp.join(".gitignore"), "/existing\n").unwrap();
+
+        ensure_gitignore(&temp, &["/docs/target/"]);
+        ensure_gitignore(&temp, &["/docs/target/"]);
+        let content = std::fs::read_to_string(temp.join(".gitignore")).unwrap();
+        assert_eq!(content, "/existing\n/docs/target/\n");
+
         let _ = std::fs::remove_dir_all(&temp);
     }
 }

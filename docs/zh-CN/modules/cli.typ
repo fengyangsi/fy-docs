@@ -11,6 +11,7 @@ cargo fy-docs html   # 仅编译离线 HTML 网页包
 cargo fy-docs pdf    # 仅导出版本化 PDF 2.0 规格说明书
 cargo fy-docs dev    # 启动开发工作台，监听源码并热重载
 cargo fy-docs init   # 初始化 docs/ 规范目录
+cargo fy-docs vendor # 将内嵌 fy-spec 模板同步到 docs/fy-spec/
 ```
 
 #contract[
@@ -21,6 +22,10 @@ cargo fy-docs init   # 初始化 docs/ 规范目录
   `init` 是唯一不需要既有 `docs/` 目录的子命令：在当前目录创建 `docs/`，写入入口 `main.typ`、
   随二进制内嵌分发的 `fy-spec/lib.typ` 模板副本和空的 `modules/` 目录，并把 `docs/target/` 与
   `docs/release/` 补入 `.gitignore`。
+]
+
+#contract[
+  `vendor` 将内嵌的 fy-spec 模板（重）写入 `docs/fy-spec/lib.typ`，使所有项目与所安装 fy-docs 版本携带的模板保持一致；该命令不需要 `typst` 二进制。`vendor --check` 仅校验副本，漂移或缺失时以非零退出码结束，供 CI 锁定模板版本。
 ]
 
 #contract[

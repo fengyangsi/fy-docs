@@ -2,6 +2,7 @@
 //! regenerates the page with a debounce.
 
 use crate::compiler;
+use crate::project::Project;
 use crate::state::AppState;
 use anyhow::Result;
 use notify::{Event, RecursiveMode, Watcher};
@@ -19,7 +20,7 @@ pub fn spawn(state: Arc<AppState>) -> Result<()> {
     std::thread::spawn(move || {
         // Hold the watcher: dropping it unregisters the watch.
         let _watcher = watcher;
-        while wait_for_source_change(&rx) {
+        while wait_for_source_change(&rx, &state.project) {
             // Reuse the startup options so `dev --lang zh-CN` keeps building
             // only the filtered language after the first save.
             let generate = &state.generate;
@@ -36,11 +37,11 @@ pub fn spawn(state: Arc<AppState>) -> Result<()> {
 
 /// Blocks until a `.typ` source change arrives, folding the editor's save
 /// burst into one notification. Returns `false` only when the channel closed.
-fn wait_for_source_change(rx: &Receiver<notify::Result<Event>>) -> bool {
+fn wait_for_source_change(rx: &Receiver<notify::Result<Event>>, project: &Project) -> bool {
     loop {
         match rx.recv() {
             Ok(Ok(event)) => {
-                if event.paths.iter().any(|path| is_typ_source(path)) {
+                if event.paths.iter().any(|path| is_typ_source(path, project)) {
                     let deadline = Instant::now() + Duration::from_millis(500);
                     while let Ok(Ok(_)) =
                         rx.recv_timeout(deadline.saturating_duration_since(Instant::now()))
@@ -55,25 +56,61 @@ fn wait_for_source_change(rx: &Receiver<notify::Result<Event>>) -> bool {
     }
 }
 
-/// Only `.typ` edits count; generated files under `docs/target/` carry other
-/// extensions, so the watcher never triggers itself.
-fn is_typ_source(path: &std::path::Path) -> bool {
+/// A `.typ` edit counts as a source change unless it lands inside the
+/// generated `target/` or `release/` directories. Excluding those by path —
+/// not only by extension — keeps the watcher from reacting to its own output
+/// even if a `.typ`-suffixed artifact ever appears there.
+fn is_typ_source(path: &std::path::Path, project: &Project) -> bool {
     path.extension().is_some_and(|ext| ext == "typ")
+        && !is_under(path, &project.target_dir)
+        && !is_under(path, &project.release_dir)
+}
+
+fn is_under(path: &std::path::Path, dir: &std::path::Path) -> bool {
+    path.strip_prefix(dir).is_ok()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::project::Project;
     use std::path::Path;
+
+    fn project_with(docs: std::path::PathBuf) -> Project {
+        Project {
+            name: "watch_test".to_owned(),
+            version: "0.1.0".to_owned(),
+            repository: None,
+            entry: docs.join("main.typ"),
+            targets: Vec::new(),
+            docs_dir: docs.clone(),
+            root: docs.parent().unwrap().to_path_buf(),
+            target_dir: docs.join("target"),
+            release_dir: docs.join("release"),
+            watch_dirs: vec![docs.clone()],
+        }
+    }
 
     #[test]
     fn is_typ_source_identifies_typst_files() {
-        assert!(is_typ_source(Path::new("main.typ")));
-        assert!(is_typ_source(Path::new("docs/modules/truth.typ")));
-        assert!(!is_typ_source(Path::new("index.html")));
-        assert!(!is_typ_source(Path::new("fy-docs.css")));
-        assert!(!is_typ_source(Path::new("Cargo.toml")));
-        assert!(!is_typ_source(Path::new("no_extension")));
+        let temp = std::env::temp_dir().join(format!("fy-docs-watch-src-{}", std::process::id()));
+        let project = project_with(temp.join("docs"));
+        assert!(is_typ_source(Path::new("main.typ"), &project));
+        assert!(is_typ_source(Path::new("docs/modules/truth.typ"), &project));
+        assert!(!is_typ_source(Path::new("index.html"), &project));
+        assert!(!is_typ_source(Path::new("Cargo.toml"), &project));
+        assert!(!is_typ_source(Path::new("no_extension"), &project));
+    }
+
+    #[test]
+    fn generated_directories_are_excluded_by_path() {
+        let temp = std::env::temp_dir().join(format!("fy-docs-watch-excl-{}", std::process::id()));
+        let project = project_with(temp.join("docs"));
+        // Even a .typ artifact inside target/ or release/ must not trigger a
+        // rebuild (path-level exclusion, not just extension filtering).
+        assert!(!is_typ_source(&project.target_dir.join("dump.typ"), &project));
+        assert!(!is_typ_source(&project.release_dir.join("spec.typ"), &project));
+        assert!(is_typ_source(&project.docs_dir.join("main.typ"), &project));
     }
 
     #[test]

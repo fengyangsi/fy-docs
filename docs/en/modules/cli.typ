@@ -11,6 +11,7 @@ cargo fy-docs html   # Compile offline HTML bundle only
 cargo fy-docs pdf    # Compile PDF 2.0 specifications only
 cargo fy-docs dev    # Start dev server with live reload & browser preview
 cargo fy-docs init   # Scaffold a self-contained docs/ directory
+cargo fy-docs vendor # Sync the embedded fy-spec template into docs/fy-spec/
 ```
 
 #contract[
@@ -19,6 +20,10 @@ cargo fy-docs init   # Scaffold a self-contained docs/ directory
 
 #contract[
   `init` is the only command that does not require an existing `docs/` folder: it creates `docs/`, starter `main.typ`, embedded `fy-spec/lib.typ`, and appends `/docs/target/` and `/docs/release/` to `.gitignore`.
+]
+
+#contract[
+  `vendor` (re)writes the embedded fy-spec template into `docs/fy-spec/lib.typ`, keeping every project on the template version shipped with the installed fy-docs. It never requires the `typst` binary. `vendor --check` only verifies the copy and exits non-zero on drift or absence, so CI can pin the template.
 ]
 
 #contract[

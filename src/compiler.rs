@@ -160,7 +160,9 @@ fn generate(project: &Project, with_pdf: bool, lang_filter: Option<&str>) -> Res
     }
 
     for (lang_target, err) in &failures {
-        if let Err(write_err) = write_error_page(project, err, &lang_target.html_file_name) {
+        if let Err(write_err) =
+            write_error_page(project, err, &lang_target.html_file_name, &lang_target.lang)
+        {
             crate::state::log(&format!(
                 "[fy-docs] could not write error page for [{}]: {write_err}",
                 lang_label(lang_target)
@@ -195,7 +197,7 @@ fn generate(project: &Project, with_pdf: bool, lang_filter: Option<&str>) -> Res
         }
     }
 
-    ensure_gitignore_ignores(project, ["/docs/target/"]);
+    ensure_gitignore(project, &["/docs/target/"]);
 
     if failures.is_empty() {
         Ok(())
@@ -318,8 +320,15 @@ pub fn compile_pdf(project: &Project, lang_filter: Option<&str>) -> Result<Vec<P
         generated_paths.push(res?);
     }
 
-    ensure_gitignore_ignores(project, ["/docs/release/"]);
+    ensure_gitignore(project, &["/docs/release/"]);
     Ok(generated_paths)
+}
+
+/// Makes sure the generated directories stay ignored (see
+/// [`crate::project::ensure_gitignore`]).
+fn ensure_gitignore(project: &Project, entries: &[&str]) {
+    let root = project.docs_dir.parent().unwrap_or(&project.docs_dir);
+    crate::project::ensure_gitignore(root, entries);
 }
 
 fn run(cmd: &mut Command) -> Result<()> {
@@ -380,36 +389,13 @@ fn extract_all_styles(html: &str) -> String {
     styles
 }
 
-/// Makes sure the generated directories stay ignored; creates the .gitignore
-/// entry when missing so `git status` stays clean without manual setup.
-fn ensure_gitignore_ignores(project: &Project, entries: impl IntoIterator<Item = &'static str>) {
-    let gitignore = project
-        .docs_dir
-        .parent()
-        .unwrap_or(&project.docs_dir)
-        .join(".gitignore");
-    let mut content = fs::read_to_string(&gitignore).unwrap_or_default();
-    let mut changed = false;
-    for entry in entries {
-        if !content.lines().any(|line| line.trim() == entry) {
-            if !content.is_empty() && !content.ends_with('\n') {
-                content.push('\n');
-            }
-            content.push_str(entry);
-            content.push('\n');
-            changed = true;
-        }
-    }
-    if changed {
-        let _ = fs::write(&gitignore, content);
-    }
-}
-
 /// Renders the compile failure as an error page at every given target so
 /// browser reloads never fall back to stale content.
 fn write_error_pages(project: &Project, targets: &[&LanguageTarget], raw_error: &str) {
     for target in targets {
-        if let Err(err) = write_error_page(project, raw_error, &target.html_file_name) {
+        if let Err(err) =
+            write_error_page(project, raw_error, &target.html_file_name, &target.lang)
+        {
             crate::state::log(&format!(
                 "[fy-docs] could not write error page {}: {err}",
                 target.html_file_name
@@ -418,11 +404,16 @@ fn write_error_pages(project: &Project, targets: &[&LanguageTarget], raw_error: 
     }
 }
 
-fn write_error_page(project: &Project, raw_error: &str, file_name: &str) -> Result<()> {
+fn write_error_page(
+    project: &Project,
+    raw_error: &str,
+    file_name: &str,
+    lang_hint: &str,
+) -> Result<()> {
     let target = &project.target_dir;
     fs::create_dir_all(target)?;
 
-    let ui = crate::assets::ui_text(&project.name, raw_error);
+    let ui = crate::assets::ui_text(Some(lang_hint), raw_error);
     let escaped_error = crate::assets::escape(raw_error);
     let body = format!(
         r#"<div class="fy-error">
@@ -526,32 +517,18 @@ mod tests {
     }
 
     #[test]
-    fn gitignore_entries_are_added_once() {
-        let temp = std::env::temp_dir().join(format!("fy-docs-ign-{}", std::process::id()));
-        let _ = fs::remove_dir_all(&temp);
-        fs::create_dir_all(temp.join("docs")).unwrap();
-        fs::write(temp.join(".gitignore"), "/existing\n").unwrap();
-
-        let project = test_project(&temp.join("docs"));
-        ensure_gitignore_ignores(&project, ["/docs/target/"]);
-        ensure_gitignore_ignores(&project, ["/docs/target/"]);
-        let content = fs::read_to_string(temp.join(".gitignore")).unwrap();
-        assert_eq!(content, "/existing\n/docs/target/\n");
-
-        let _ = fs::remove_dir_all(temp);
-    }
-
-    #[test]
     fn error_page_targets_the_given_file() {
         let temp = std::env::temp_dir().join(format!("fy-docs-errpage-{}", std::process::id()));
         let _ = fs::remove_dir_all(&temp);
         fs::create_dir_all(temp.join("docs")).unwrap();
         let project = test_project(&temp.join("docs"));
 
-        write_error_page(&project, "boom <b>detail</b>", "index_zh-CN.html").unwrap();
+        write_error_page(&project, "boom <b>detail</b>", "index_zh-CN.html", "zh-CN").unwrap();
         let page = fs::read_to_string(temp.join("docs/target/index_zh-CN.html")).unwrap();
         assert!(page.contains("fy-error"));
         assert!(page.contains("boom &lt;b&gt;detail&lt;/b&gt;"));
+        // The zh-CN target gets a localized error page.
+        assert!(page.contains("<html lang=\"zh-CN\">"));
         // The landing page must stay untouched by error output.
         assert!(!temp.join("docs/target/index.html").is_file());
 

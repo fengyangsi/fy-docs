@@ -55,6 +55,12 @@ struct Cli {
 enum Command {
     /// Scaffold a new docs/ directory with a starter template
     Init,
+    /// Sync the embedded fy-spec template into docs/fy-spec/lib.typ
+    Vendor {
+        /// Verify the vendored template without writing; non-zero on drift
+        #[arg(long)]
+        check: bool,
+    },
     /// Build everything (HTML pages and PDF 2.0 specifications) - default command
     Build,
     /// Build only the offline HTML documentation
@@ -81,6 +87,11 @@ async fn dispatch(cli: Cli, cwd: &Path) -> Result<()> {
         return scaffold::init(cwd);
     }
 
+    // Vendor only copies the embedded template; it needs no typst binary.
+    if let Some(Command::Vendor { check }) = cli.command {
+        return scaffold::vendor(cwd, check);
+    }
+
     // Every remaining command compiles, so fail fast on a missing or old typst.
     compiler::precheck()?;
 
@@ -95,7 +106,8 @@ async fn dispatch(cli: Cli, cwd: &Path) -> Result<()> {
     ));
 
     match cli.command {
-        Some(Command::Init) => unreachable!(),
+        // Init and Vendor returned before project detection and precheck.
+        Some(Command::Init | Command::Vendor { .. }) => unreachable!(),
         None | Some(Command::Build) => {
             // Default: Full build of both HTML and PDF
             let ok = compiler::generate_into(&state, true, cli.lang.as_deref());
