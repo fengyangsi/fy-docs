@@ -259,6 +259,16 @@ mod tests {
 
     #[tokio::test]
     async fn dispatch_executes_build_pdf_html_init_commands() {
+        // The build arms exit the process on compile failure, so this test
+        // needs a working typst; skip where none is installed.
+        if !std::process::Command::new("typst")
+            .arg("--version")
+            .output()
+            .is_ok_and(|output| output.status.success())
+        {
+            eprintln!("skipping: typst is not on PATH");
+            return;
+        }
         let temp = std::env::temp_dir().join(format!("fy-docs-main-run-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&temp);
         std::fs::create_dir_all(&temp).unwrap();

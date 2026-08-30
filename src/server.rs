@@ -23,9 +23,8 @@ pub fn router(state: &Arc<AppState>) -> Router {
                 let seed = iter(vec![Ok::<_, Infallible>(
                     SseEvent::default().data(current.to_string()),
                 )]);
-                let live = WatchStream::new(events.clone()).map(|id| {
-                    Ok::<_, Infallible>(SseEvent::default().data(id.to_string()))
-                });
+                let live = WatchStream::new(events.clone())
+                    .map(|id| Ok::<_, Infallible>(SseEvent::default().data(id.to_string())));
                 async move { Sse::new(seed.chain(live)).keep_alive(KeepAlive::default()) }
             }),
         )
@@ -73,7 +72,10 @@ mod tests {
 
         assert_eq!(response.status(), 200);
         assert_eq!(
-            response.headers().get(axum::http::header::CONTENT_TYPE).unwrap(),
+            response
+                .headers()
+                .get(axum::http::header::CONTENT_TYPE)
+                .unwrap(),
             "text/event-stream"
         );
         // The seed frame carries the current build id.

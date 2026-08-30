@@ -346,7 +346,14 @@ mod tests {
             html_file_name: "index_ja.html".to_owned(),
             pdf_file_name: "x.pdf".to_owned(),
         };
-        let page = doc_page("文書", "fy-x", None, "<h1>こんにちは</h1>", Some(&ja_target), &[]);
+        let page = doc_page(
+            "文書",
+            "fy-x",
+            None,
+            "<h1>こんにちは</h1>",
+            Some(&ja_target),
+            &[],
+        );
         assert!(page.contains("<html lang=\"en\">"));
     }
 

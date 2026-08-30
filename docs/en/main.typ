@@ -4,7 +4,7 @@
 #show: project_book.with(
   title: "fy-docs Specification",
   subtitle: "Multilingual Typst Specification Compiler & Live Viewer",
-  version: "0.1.6",
+  version: "0.1.7",
   author: "fengyangsi",
   date: "2026-08-30",
   lang: "en",

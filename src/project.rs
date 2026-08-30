@@ -356,9 +356,7 @@ pub(crate) fn ensure_gitignore(root: &Path, entries: &[&str]) {
             changed = true;
         }
     }
-    if changed
-        && let Err(err) = std::fs::write(&gitignore, content)
-    {
+    if changed && let Err(err) = std::fs::write(&gitignore, content) {
         crate::state::log(&format!(
             "[fy-docs] could not update {}: {err}",
             gitignore.display()

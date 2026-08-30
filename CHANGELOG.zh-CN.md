@@ -7,6 +7,36 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本遵循 [语义化版本 2.0.0](https://semver.org/lang/zh-CN/)。
 
+## [0.1.7] - 2026-08-30
+
+### 新增
+- **`vendor` 子命令**：`cargo fy-docs vendor` 将内嵌的 fy-spec 模板（重）写入 `docs/fy-spec/lib.typ`；`vendor --check` 只读校验、漂移即非零退出，供 CI 锁定模板版本。该命令无需 typst。
+- **SSE 热重载**：dev 服务器通过 `/events`（Server-Sent Events）流推送构建编号，取代 1.5 秒轮询；单轨 `live.js` 客户端随静态构建一同分发，无服务器应答时静默关闭。
+- **typst 预检**：所有编译类命令启动即校验 `typst` 存在且不低于 0.14，以可操作的信息报错，而非裸露的参数错误。
+- **Windows CI 测试任务**，并在 CI 中将 typst 锁定到 0.15.1，让「基于 Typst 0.15 测试」成为强制事实而非口头声明。
+- **真实二进制集成测试**：全新构建、损坏源码退出码、vendor 漂移校验均对真实可执行文件运行；无 typst 环境自动跳过。
+- **fy-spec 唯一真身**：模板的 `typst.toml` 与 `examples/basic.typ` 迁入本仓库 `docs/fy-spec/`；`lib.typ` 与 `base.css` 之间的 HTML 类名契约以自食文档章节固化。
+
+### 变更
+- **退出码**：`build` 与 `html` 在编译失败时以非零退出码结束（此前写完错误页后仍退出 0），CI 流水线得以拦截损坏文档；`dev` 服务器依旧存活并将失败渲染为错误页。
+- dev 模式重建继承启动时的 `--lang` / `--with-pdf` 选项，不再在首次保存后悄悄全量重建。
+- 编译失败按语言写入错误页（`index_<lang>.html`）；成功的语言保留最新产物，多语言分流页绝不被错误输出覆盖。
+- 产物原子写入（同目录临时文件 + rename），dev 服务器重载期间不可能读到半截页面。
+- watcher 按路径排除 `docs/target/` 与 `docs/release/`，不再仅依赖扩展名过滤。
+- UI 语言改由文档语言目标推导，弃用 CJK 字符嗅探（日文文档不再误判为中文）。
+- 最低 Typst 版本由 0.13 提升至 0.14：fy-docs 传入的 `--pdf-standard 2.0` 自该版本起才受支持。
+- 修正 README：PDF 文件名补语言后缀、参数表补全 `--with-pdf`/`--no-open`、版本下限如实标注。
+
+### 修复
+- 重定向分流页的取值按 JavaScript 字符串上下文转义（反斜杠、控制字符），默认跳转目标在脚本与 `<noscript>` 两处均过转义；异常语言目录不再可能产出非法 JS。
+- 编译线程 panic 降级为该语言的错误页与一行日志，不再中止整个进程。
+- `_temp_*.html` 中间文件在所有路径（含提取失败）下均被删除。
+- `<body>` 提取容忍开始标签带属性，typst 导出格式演进不再破坏页面拼装。
+- Cargo.toml 解析统一：`init` 现与 `build` 一样解析 `workspace = true` 继承版本；两处重复的 `.gitignore` helper 合一。
+
+### 移除
+- 独立仓库 `fy-spec` 退役；各项目经 `cargo fy-docs vendor` 自持模板副本，本仓库成为模板唯一真身。
+
 ## [0.1.6] - 2026-08-30
 
 ### 新增

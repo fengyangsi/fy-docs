@@ -21,13 +21,10 @@ const MINIMUM_TYPST: (u64, u64, u64) = (0, 14, 0);
 /// Verifies that the `typst` CLI exists and is new enough for the flags
 /// fy-docs passes (`--features html`, `--pdf-standard 2.0`).
 pub fn precheck() -> Result<()> {
-    let output = Command::new("typst")
-        .arg("--version")
-        .output()
-        .context(
-            "typst was not found on PATH — install Typst 0.14 or later \
+    let output = Command::new("typst").arg("--version").output().context(
+        "typst was not found on PATH — install Typst 0.14 or later \
              (https://github.com/typst/typst/releases)",
-        )?;
+    )?;
     let banner = String::from_utf8_lossy(&output.stdout);
     match typst_banner_version(&banner) {
         Some(version) if version < MINIMUM_TYPST => bail!(
@@ -90,9 +87,7 @@ fn generate(project: &Project, with_pdf: bool, lang_filter: Option<&str>) -> Res
         );
     }
 
-    if with_pdf
-        && let Err(err) = compile_pdf(project, lang_filter)
-    {
+    if with_pdf && let Err(err) = compile_pdf(project, lang_filter) {
         write_error_pages(project, &selected_targets, &format!("{err:#}"));
         return Err(err);
     }
@@ -104,7 +99,10 @@ fn generate(project: &Project, with_pdf: bool, lang_filter: Option<&str>) -> Res
         let mut handles = Vec::new();
         for lang_target in &selected_targets {
             handles.push(s.spawn(move || {
-                (lang_target, compile_html_target(project, lang_target, target))
+                (
+                    lang_target,
+                    compile_html_target(project, lang_target, target),
+                )
             }));
         }
         let mut results = Vec::new();
@@ -141,10 +139,10 @@ fn generate(project: &Project, with_pdf: bool, lang_filter: Option<&str>) -> Res
         }
     }
 
-    fs::write(target.join(TYPST_CSS_FILE), combined_styles)?;
-    fs::write(target.join(SKIN_FILE), crate::assets::BASE_CSS)?;
-    fs::write(target.join(VIEWER_JS_FILE), crate::assets::VIEWER_JS)?;
-    fs::write(target.join(LIVE_JS_FILE), crate::assets::LIVE_JS)?;
+    write_atomic(&target.join(TYPST_CSS_FILE), &combined_styles)?;
+    write_atomic(&target.join(SKIN_FILE), crate::assets::BASE_CSS)?;
+    write_atomic(&target.join(VIEWER_JS_FILE), crate::assets::VIEWER_JS)?;
+    write_atomic(&target.join(LIVE_JS_FILE), crate::assets::LIVE_JS)?;
 
     for (lang_target, title, body) in &rendered_pages {
         let page_html = crate::assets::doc_page(
@@ -155,7 +153,7 @@ fn generate(project: &Project, with_pdf: bool, lang_filter: Option<&str>) -> Res
             Some(lang_target),
             &project.targets,
         );
-        fs::write(target.join(&lang_target.html_file_name), &page_html)?;
+        write_atomic(&target.join(&lang_target.html_file_name), &page_html)?;
     }
 
     for (lang_target, err) in &failures {
@@ -188,11 +186,11 @@ fn generate(project: &Project, with_pdf: bool, lang_filter: Option<&str>) -> Res
                 Some(first_target),
                 &project.targets,
             );
-            fs::write(target.join(INDEX_FILE), default_page)?;
+            write_atomic(&target.join(INDEX_FILE), &default_page)?;
         } else {
             // Multi-language: write lightweight (~500B) client-side redirect landing page
             let landing = crate::assets::redirect_page(&project.targets);
-            fs::write(target.join(INDEX_FILE), landing)?;
+            write_atomic(&target.join(INDEX_FILE), &landing)?;
         }
     }
 
@@ -208,6 +206,22 @@ fn generate(project: &Project, with_pdf: bool, lang_filter: Option<&str>) -> Res
             .join("\n");
         Err(anyhow!("{summary}"))
     }
+}
+
+/// Writes a file atomically: the content lands in a sibling temp file that
+/// is renamed over the destination, so a concurrent HTTP read from the dev
+/// server never observes a half-written page.
+fn write_atomic(path: &Path, contents: &str) -> Result<()> {
+    use std::io::Write as _;
+    let parent = path
+        .parent()
+        .context("output path has no parent directory")?;
+    let mut temp = tempfile::NamedTempFile::new_in(parent)
+        .with_context(|| format!("could not create a temp file next to {}", path.display()))?;
+    temp.write_all(contents.as_bytes())?;
+    temp.persist(path)
+        .map_err(|err| anyhow!("could not replace {}: {err}", path.display()))?;
+    Ok(())
 }
 
 /// The display label of a target's language: its tag, or `default` for a
@@ -258,8 +272,8 @@ fn compile_html_target(
         })?;
 
         let html = fs::read_to_string(&temp_html)?;
-        let title = extract_between(&html, "<title>", "</title>")
-            .unwrap_or_else(|| project.name.clone());
+        let title =
+            extract_between(&html, "<title>", "</title>").unwrap_or_else(|| project.name.clone());
         let styles = extract_all_styles(&html);
         let body = extract_body(&html).context("typst HTML export contains no <body>")?;
         Ok((title, styles, body))
@@ -392,8 +406,7 @@ fn extract_all_styles(html: &str) -> String {
 /// browser reloads never fall back to stale content.
 fn write_error_pages(project: &Project, targets: &[&LanguageTarget], raw_error: &str) {
     for target in targets {
-        if let Err(err) =
-            write_error_page(project, raw_error, &target.html_file_name, &target.lang)
+        if let Err(err) = write_error_page(project, raw_error, &target.html_file_name, &target.lang)
         {
             crate::state::log(&format!(
                 "[fy-docs] could not write error page {}: {err}",
@@ -433,11 +446,11 @@ fn write_error_page(
         &project.targets,
     );
 
-    fs::write(target.join(file_name), page)?;
-    fs::write(target.join(SKIN_FILE), crate::assets::BASE_CSS)?;
-    fs::write(target.join(VIEWER_JS_FILE), crate::assets::VIEWER_JS)?;
-    fs::write(target.join(TYPST_CSS_FILE), "")?;
-    fs::write(target.join(LIVE_JS_FILE), crate::assets::LIVE_JS)?;
+    write_atomic(&target.join(file_name), &page)?;
+    write_atomic(&target.join(SKIN_FILE), crate::assets::BASE_CSS)?;
+    write_atomic(&target.join(VIEWER_JS_FILE), crate::assets::VIEWER_JS)?;
+    write_atomic(&target.join(TYPST_CSS_FILE), "")?;
+    write_atomic(&target.join(LIVE_JS_FILE), crate::assets::LIVE_JS)?;
     Ok(())
 }
 
@@ -479,7 +492,10 @@ mod tests {
             extract_body(r#"<html><body lang="en"><p>hi</p></body></html>"#),
             Some("<p>hi</p>".to_owned())
         );
-        assert_eq!(extract_body("<body><p>plain</p></body>"), Some("<p>plain</p>".to_owned()));
+        assert_eq!(
+            extract_body("<body><p>plain</p></body>"),
+            Some("<p>plain</p>".to_owned())
+        );
         assert_eq!(extract_body("<div>no body</div>"), None);
     }
 

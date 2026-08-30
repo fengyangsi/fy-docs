@@ -108,8 +108,14 @@ mod tests {
         let project = project_with(temp.join("docs"));
         // Even a .typ artifact inside target/ or release/ must not trigger a
         // rebuild (path-level exclusion, not just extension filtering).
-        assert!(!is_typ_source(&project.target_dir.join("dump.typ"), &project));
-        assert!(!is_typ_source(&project.release_dir.join("spec.typ"), &project));
+        assert!(!is_typ_source(
+            &project.target_dir.join("dump.typ"),
+            &project
+        ));
+        assert!(!is_typ_source(
+            &project.release_dir.join("spec.typ"),
+            &project
+        ));
         assert!(is_typ_source(&project.docs_dir.join("main.typ"), &project));
     }
 
