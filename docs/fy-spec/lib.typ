@@ -75,6 +75,131 @@
 #let font-sans = default-fonts.sans
 #let font-mono = default-fonts.mono
 
+/// Multi-language localization dictionary for specifications.
+#let i18n-strings = (
+  "en": (
+    edition: "PROJECT SPECIFICATION · ISO B5 EDITION",
+    version: "Version:",
+    author: "Author:",
+    date: "Date:",
+    methodology: "Methodology:",
+    toc: "Table of Contents",
+    contract: "Interface Contract",
+    invariant: "Core Invariant",
+    example: "Specification Example",
+    logic: "Logical Rules",
+    proof: "Proof Strategy",
+    math: "Mathematical Model",
+    geom: "Geometry Model",
+    axiom: "Geometric Axiom",
+    motion: "Motion Model",
+    status-label: "Status:",
+    phase-label: "Phase:",
+    status-pending: "Pending",
+    status-done: "Established",
+  ),
+  "zh": (
+    edition: "规格说明书 · ISO B5 典藏版",
+    version: "版本:",
+    author: "作者:",
+    date: "构建日期:",
+    methodology: "核心范式:",
+    toc: "目 录",
+    contract: "强类型接口与规格契约",
+    invariant: "核心不变性与安全约束",
+    example: "规格用例与状态验证",
+    logic: "形式逻辑与推理规则",
+    proof: "证明策略与启发式搜索",
+    math: "数学推导与数值模型",
+    geom: "几何结构与空间模型",
+    axiom: "几何公理与推演法则",
+    motion: "运动学模型与时序法则",
+    status-label: "状态:",
+    phase-label: "阶段:",
+    status-pending: "待确立",
+    status-done: "已确立",
+  ),
+  "ja": (
+    edition: "仕様書 · ISO B5 版",
+    version: "バージョン:",
+    author: "作成者:",
+    date: "作成日:",
+    methodology: "方法論:",
+    toc: "目 次",
+    contract: "インターフェース契約",
+    invariant: "不変条件",
+    example: "仕様例と検証",
+    logic: "論理規則",
+    proof: "証明戦略",
+    math: "数学モデル",
+    geom: "幾何学モデル",
+    axiom: "幾何公理",
+    motion: "運動学モデル",
+    status-label: "状態:",
+    phase-label: "フェーズ:",
+    status-pending: "未確立",
+    status-done: "確立済",
+  ),
+  "de": (
+    edition: "PROJEKTSPEZIFIKATION · ISO B5 AUSGABE",
+    version: "Version:",
+    author: "Autor:",
+    date: "Datum:",
+    methodology: "Methodik:",
+    toc: "Inhaltsverzeichnis",
+    contract: "Schnittstellenvertrag",
+    invariant: "Kerninvariante",
+    example: "Spezifikationsbeispiel",
+    logic: "Logische Regeln",
+    proof: "Beweisstrategie",
+    math: "Mathematisches Modell",
+    geom: "Geometriemodell",
+    axiom: "Geometrisches Axiom",
+    motion: "Bewegungsmodell",
+    status-label: "Status:",
+    phase-label: "Phase:",
+    status-pending: "Ausstehend",
+    status-done: "Etabliert",
+  ),
+  "fr": (
+    edition: "SPÉCIFICATION DU PROJET · ÉDITION ISO B5",
+    version: "Version :",
+    author: "Auteur :",
+    date: "Date :",
+    methodology: "Méthodologie :",
+    toc: "Table des matières",
+    contract: "Contrat d'interface",
+    invariant: "Invariant central",
+    example: "Exemple de spécification",
+    logic: "Règles logiques",
+    proof: "Stratégie de preuve",
+    math: "Modèle mathématique",
+    geom: "Modèle géométrique",
+    axiom: "Axiome géométrique",
+    motion: "Modèle cinématique",
+    status-label: "Statut :",
+    phase-label: "Phase :",
+    status-pending: "En attente",
+    status-done: "Établi",
+  ),
+)
+
+/// Resolves a localized string key from the dictionary with safe fallback.
+#let resolve-i18n(key, lang: auto) = {
+  let cur-lang = if lang != auto { lang } else { text.lang }
+  let base-lang = if cur-lang != none and cur-lang.contains("-") { cur-lang.split("-").at(0) } else { cur-lang }
+
+  if cur-lang != none and cur-lang in i18n-strings and key in i18n-strings.at(cur-lang) {
+    i18n-strings.at(cur-lang).at(key)
+  } else if base-lang != none and base-lang in i18n-strings and key in i18n-strings.at(base-lang) {
+    i18n-strings.at(base-lang).at(key)
+  } else if key in i18n-strings.at("en") {
+    i18n-strings.at("en").at(key)
+  } else {
+    key
+  }
+}
+
 /// Horizontally centered content that survives HTML export.
 #let centered(body) = context {
   if target() == "html" {
@@ -104,33 +229,20 @@
     (lang, region)
   }
 
-  let is-zh = parsed-lang == "zh"
-
   let active-fonts = (
     serif: if "serif" in fonts { fonts.serif } else { default-fonts.serif },
     sans: if "sans" in fonts { fonts.sans } else { default-fonts.sans },
     mono: if "mono" in fonts { fonts.mono } else { default-fonts.mono },
   )
 
-  let labels = if is-zh {
-    (
-      edition: "规格说明书 · ISO B5 典藏版",
-      version: "版本:",
-      author: "作者:",
-      date: "构建日期:",
-      methodology: "核心范式:",
-      toc: "目 录",
-    )
-  } else {
-    (
-      edition: "PROJECT SPECIFICATION · ISO B5 EDITION",
-      version: "Version:",
-      author: "Author:",
-      date: "Date:",
-      methodology: "Methodology:",
-      toc: "Table of Contents",
-    )
-  }
+  let labels = (
+    edition: resolve-i18n("edition", lang: parsed-lang),
+    version: resolve-i18n("version", lang: parsed-lang),
+    author: resolve-i18n("author", lang: parsed-lang),
+    date: resolve-i18n("date", lang: parsed-lang),
+    methodology: resolve-i18n("methodology", lang: parsed-lang),
+    toc: resolve-i18n("toc", lang: parsed-lang),
+  )
 
   set document(title: title, author: if author != none { author } else { () })
 
@@ -363,9 +475,7 @@
 }
 
 #let contract(body, title: auto) = context {
-  let is-zh = text.lang == "zh"
-  let default-title = if is-zh { "强类型接口与规格契约" } else { "Interface Contract" }
-  let effective-title = if title == auto { default-title } else { title }
+  let effective-title = if title == auto { resolve-i18n("contract") } else { title }
   callout(
     body,
     title: effective-title,
@@ -378,9 +488,7 @@
 }
 
 #let invariant(body, title: auto) = context {
-  let is-zh = text.lang == "zh"
-  let default-title = if is-zh { "核心不变性与安全约束" } else { "Core Invariant" }
-  let effective-title = if title == auto { default-title } else { title }
+  let effective-title = if title == auto { resolve-i18n("invariant") } else { title }
   callout(
     body,
     title: effective-title,
@@ -393,9 +501,7 @@
 }
 
 #let logic-box(body, title: auto) = context {
-  let is-zh = text.lang == "zh"
-  let default-title = if is-zh { "形式逻辑与推理规则" } else { "Logical Rules" }
-  let effective-title = if title == auto { default-title } else { title }
+  let effective-title = if title == auto { resolve-i18n("logic") } else { title }
   callout(
     body,
     title: effective-title,
@@ -405,9 +511,7 @@
 }
 
 #let proof-box(body, title: auto) = context {
-  let is-zh = text.lang == "zh"
-  let default-title = if is-zh { "证明策略与启发式搜索" } else { "Proof Strategy" }
-  let effective-title = if title == auto { default-title } else { title }
+  let effective-title = if title == auto { resolve-i18n("proof") } else { title }
   callout(
     body,
     title: effective-title,
@@ -417,9 +521,7 @@
 }
 
 #let math-box(body, title: auto) = context {
-  let is-zh = text.lang == "zh"
-  let default-title = if is-zh { "数学推导与数值模型" } else { "Mathematical Model" }
-  let effective-title = if title == auto { default-title } else { title }
+  let effective-title = if title == auto { resolve-i18n("math") } else { title }
   callout(
     body,
     title: effective-title,
@@ -429,9 +531,7 @@
 }
 
 #let geom-box(body, title: auto) = context {
-  let is-zh = text.lang == "zh"
-  let default-title = if is-zh { "几何结构与空间模型" } else { "Geometry Model" }
-  let effective-title = if title == auto { default-title } else { title }
+  let effective-title = if title == auto { resolve-i18n("geom") } else { title }
   callout(
     body,
     title: effective-title,
@@ -441,9 +541,7 @@
 }
 
 #let axiom-box(body, title: auto) = context {
-  let is-zh = text.lang == "zh"
-  let default-title = if is-zh { "几何公理与推演法则" } else { "Geometric Axiom" }
-  let effective-title = if title == auto { default-title } else { title }
+  let effective-title = if title == auto { resolve-i18n("axiom") } else { title }
   callout(
     body,
     title: effective-title,
@@ -453,9 +551,7 @@
 }
 
 #let motion-box(body, title: auto) = context {
-  let is-zh = text.lang == "zh"
-  let default-title = if is-zh { "运动学模型与时序法则" } else { "Motion Model" }
-  let effective-title = if title == auto { default-title } else { title }
+  let effective-title = if title == auto { resolve-i18n("motion") } else { title }
   callout(
     body,
     title: effective-title,
@@ -465,9 +561,7 @@
 }
 
 #let example-box(body, title: auto) = context {
-  let is-zh = text.lang == "zh"
-  let default-title = if is-zh { "规格用例与状态验证" } else { "Specification Example" }
-  let effective-title = if title == auto { default-title } else { title }
+  let effective-title = if title == auto { resolve-i18n("example") } else { title }
   callout(
     body,
     title: effective-title,
@@ -479,29 +573,31 @@
   )
 }
 
-#let status-badge(status: "待确立", phase: "阶段 1") = {
-  let pending = status.contains("待") or status.contains("pending") or status.contains("WIP")
+#let status-badge(status: auto, phase: auto) = context {
+  let def-status = if status == auto { resolve-i18n("status-pending") } else { status }
+  let def-phase = if phase == auto { "1" } else { phase }
+  let pending = def-status.contains("待") or def-status.contains("pending") or def-status.contains("WIP") or def-status.contains("未") or def-status.contains("Ausstehend") or def-status.contains("attente")
   let state = if pending { "pending" } else { "done" }
   let marker = if pending { "○" } else { "✓" }
+  let status-lbl = resolve-i18n("status-label")
+  let phase-lbl = resolve-i18n("phase-label")
 
-  context {
-    if target() == "html" {
-      html.span(class: ("fy-badge", "fy-badge-" + state))[
-        #marker 状态: #status | 阶段: #phase
+  if target() == "html" {
+    html.span(class: ("fy-badge", "fy-badge-" + state))[
+      #marker #status-lbl #def-status | #phase-lbl #def-phase
+    ]
+  } else {
+    let badge = if pending { palette.badge-pending } else { palette.badge-done }
+    box(
+      fill: badge.bg,
+      stroke: 0.5pt + badge.border,
+      inset: (x: 6pt, y: 2.5pt),
+      radius: 3pt,
+      baseline: 0%,
+    )[
+      #text(size: 8pt, weight: "bold", fill: badge.fg, font: default-fonts.mono)[
+        #marker #status-lbl #def-status | #phase-lbl #def-phase
       ]
-    } else {
-      let badge = if pending { palette.badge-pending } else { palette.badge-done }
-      box(
-        fill: badge.bg,
-        stroke: 0.5pt + badge.border,
-        inset: (x: 6pt, y: 2.5pt),
-        radius: 3pt,
-        baseline: 0%,
-      )[
-        #text(size: 8pt, weight: "bold", fill: badge.fg, font: default-fonts.mono)[
-          #marker 状态: #status | 阶段: #phase
-        ]
-      ]
-    }
+    ]
   }
 }
