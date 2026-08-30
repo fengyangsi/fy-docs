@@ -7,6 +7,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.9] - 2026-08-31
+
+### Fixed
+- Dev-mode live reload reacts to the first save again: the `/events` stream sends the current build id once as the subscriber baseline (`WatchStream::new`), so opening a page and saving immediately reloads it instead of requiring a second rebuild. This reverts the 0.1.8 `WatchStream::from_changes` change, which suppressed every page's initial baseline frame; the duplicate seed frame it fixed stays fixed.
+
 ## [0.1.8] - 2026-08-31
 
 ### Fixed
