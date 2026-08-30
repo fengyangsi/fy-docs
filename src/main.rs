@@ -34,7 +34,8 @@ struct Cli {
     #[arg(long, global = true)]
     open: bool,
 
-    /// Also compile a print-edition PDF into docs/release/ (for build/html subcommands)
+    /// Also compile a print-edition PDF into docs/release/ (html and dev
+    /// subcommands; build always compiles PDFs)
     #[arg(long, global = true)]
     with_pdf: bool,
 
@@ -80,14 +81,24 @@ async fn dispatch(cli: Cli, cwd: &Path) -> Result<()> {
         return scaffold::init(cwd);
     }
 
+    // Every remaining command compiles, so fail fast on a missing or old typst.
+    compiler::precheck()?;
+
     let project = project::detect(cwd, cli.root.as_deref())?;
-    let state = Arc::new(AppState::new(project));
+    // Capture the CLI options so dev-mode rebuilds repeat the same generation.
+    let state = Arc::new(AppState::with_generate(
+        project,
+        state::GenerateOptions {
+            with_pdf: cli.with_pdf,
+            lang_filter: cli.lang.clone(),
+        },
+    ));
 
     match cli.command {
         Some(Command::Init) => unreachable!(),
         None | Some(Command::Build) => {
             // Default: Full build of both HTML and PDF
-            compiler::generate_into(&state, true, cli.lang.as_deref());
+            let ok = compiler::generate_into(&state, true, cli.lang.as_deref());
             state.write_build();
             state::log(&format!(
                 "[fy-docs] generated {}",
@@ -97,10 +108,13 @@ async fn dispatch(cli: Cli, cwd: &Path) -> Result<()> {
                 let index_path = state.project.target_dir.join(compiler::INDEX_FILE);
                 let _ = open::that_detached(index_path);
             }
+            if !ok {
+                std::process::exit(1);
+            }
         }
         Some(Command::Html) => {
             // HTML only (or with PDF if explicitly asked)
-            compiler::generate_into(&state, cli.with_pdf, cli.lang.as_deref());
+            let ok = compiler::generate_into(&state, cli.with_pdf, cli.lang.as_deref());
             state.write_build();
             state::log(&format!(
                 "[fy-docs] HTML generated in {}",
@@ -109,6 +123,9 @@ async fn dispatch(cli: Cli, cwd: &Path) -> Result<()> {
             if cli.open {
                 let index_path = state.project.target_dir.join(compiler::INDEX_FILE);
                 let _ = open::that_detached(index_path);
+            }
+            if !ok {
+                std::process::exit(1);
             }
         }
         Some(Command::Pdf) => {

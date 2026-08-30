@@ -23,6 +23,10 @@ cargo fy-docs init   # 初始化 docs/ 规范目录
   `docs/release/` 补入 `.gitignore`。
 ]
 
+#contract[
+  所有编译类子命令在运行前预检 `typst` CLI：二进制缺失或版本低于 0.14（首个支持 `--pdf-standard 2.0` 的版本）时立即中止，并给出可操作的报错信息。
+]
+
 #invariant[
-  `cargo fy-docs` 默认命令以及 `build`、`html`、`pdf` 子命令均为*一次性幂等构建*，构建完成后必须以退出码 `0` 安全退出，严禁在无交互模式下挂起阻塞 CI 流水线。
+  `cargo fy-docs` 默认命令以及 `build`、`html`、`pdf` 子命令均为*一次性幂等构建*，严禁在无交互模式下挂起阻塞 CI 流水线。构建完全成功方以退出码 `0` 退出；编译失败必须以非零退出码结束，确保流水线能拦截损坏的文档。`dev` 模式则始终存活，将失败渲染为错误页。
 ]

@@ -57,7 +57,9 @@ Common options:
 cargo fy-docs --lang zh-CN    # Target a specific language
 cargo fy-docs --open          # Open in browser after build
 cargo fy-docs --root D:\Code  # Explicitly specify Typst root
+cargo fy-docs --with-pdf      # html/dev: also compile the print-edition PDF
 cargo fy-docs dev --port 8181 # Customize dev server port
+cargo fy-docs dev --no-open   # Dev mode without opening a browser
 ```
 
 ## Output
@@ -65,7 +67,7 @@ cargo fy-docs dev --port 8181 # Customize dev server port
 | Artifact | Location |
 |---|---|
 | Offline HTML reading page | `docs/target/index.html` |
-| Print-edition PDF | `docs/release/<package>_v<version>_specification.pdf` |
+| Print-edition PDF | `docs/release/<package>_v<version>[_<lang>]_specification.pdf` |
 
 The package name and version are read from `[package]` in `Cargo.toml`, including Cargo workspace inheritance. If the manifest has no package metadata, fy-docs falls back to the document's `version:` field and then to `0.1.0`.
 
@@ -109,7 +111,7 @@ project/
 
 ## Requirements
 
-`typst` must be available on `PATH` with HTML export support (Typst 0.13 or later). fy-docs is developed and tested against Typst 0.15.
+`typst` must be available on `PATH` (Typst 0.14 or later — the `--pdf-standard 2.0` flag fy-docs passes requires it). fy-docs is developed and tested against Typst 0.15.
 
 ## Changelog
 

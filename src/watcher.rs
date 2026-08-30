@@ -20,7 +20,10 @@ pub fn spawn(state: Arc<AppState>) -> Result<()> {
         // Hold the watcher: dropping it unregisters the watch.
         let _watcher = watcher;
         while wait_for_source_change(&rx) {
-            compiler::generate_into(&state, false, None);
+            // Reuse the startup options so `dev --lang zh-CN` keeps building
+            // only the filtered language after the first save.
+            let generate = &state.generate;
+            compiler::generate_into(&state, generate.with_pdf, generate.lang_filter.as_deref());
             state.bump_build();
             crate::state::log(&format!(
                 "[fy-docs] build #{} finished",

@@ -4,16 +4,37 @@ use crate::project::Project;
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 
+/// Options captured at startup; dev-mode rebuilds reuse them so a filtered
+/// session (for example `dev --lang zh-CN`) stays filtered after the first
+/// save instead of silently rebuilding every language.
+#[derive(Debug, Clone, Default)]
+pub struct GenerateOptions {
+    /// Also compile the print-edition PDF on every rebuild.
+    pub with_pdf: bool,
+    /// Restrict generation to one language target, e.g. `Some("zh-CN")`.
+    pub lang_filter: Option<String>,
+}
+
 pub struct AppState {
     pub project: Project,
     pub build_id: AtomicU64,
+    /// Startup options reused by the watcher on every rebuild.
+    pub generate: GenerateOptions,
 }
 
 impl AppState {
+    /// Plain constructor for contexts without CLI options (tests, tooling).
+    #[allow(dead_code)]
     pub fn new(project: Project) -> Self {
+        Self::with_generate(project, GenerateOptions::default())
+    }
+
+    /// Captures the CLI options so later rebuilds repeat the same generation.
+    pub fn with_generate(project: Project, generate: GenerateOptions) -> Self {
         Self {
             project,
             build_id: AtomicU64::new(1),
+            generate,
         }
     }
 
@@ -67,6 +88,7 @@ pub fn display_path(path: &Path) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::PathBuf;
 
     #[test]
     fn displays_normal_windows_paths_without_verbatim_prefix() {
@@ -113,5 +135,45 @@ mod tests {
     #[test]
     fn log_executes_safely() {
         log("test log output");
+    }
+
+    #[test]
+    fn with_generate_captures_startup_options() {
+        let state = AppState::with_generate(
+            Project {
+                name: "test".to_owned(),
+                version: "0.1.0".to_owned(),
+                repository: None,
+                entry: PathBuf::new(),
+                targets: Vec::new(),
+                docs_dir: PathBuf::new(),
+                root: PathBuf::new(),
+                target_dir: PathBuf::new(),
+                release_dir: PathBuf::new(),
+                watch_dirs: Vec::new(),
+            },
+            GenerateOptions {
+                with_pdf: true,
+                lang_filter: Some("zh-CN".to_owned()),
+            },
+        );
+        assert!(state.generate.with_pdf);
+        assert_eq!(state.generate.lang_filter.as_deref(), Some("zh-CN"));
+
+        // The plain constructor keeps the dev defaults.
+        let plain = AppState::new(Project {
+            name: "test".to_owned(),
+            version: "0.1.0".to_owned(),
+            repository: None,
+            entry: PathBuf::new(),
+            targets: Vec::new(),
+            docs_dir: PathBuf::new(),
+            root: PathBuf::new(),
+            target_dir: PathBuf::new(),
+            release_dir: PathBuf::new(),
+            watch_dirs: Vec::new(),
+        });
+        assert!(!plain.generate.with_pdf);
+        assert!(plain.generate.lang_filter.is_none());
     }
 }

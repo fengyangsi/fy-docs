@@ -57,7 +57,9 @@ cargo fy-docs dev
 cargo fy-docs --lang zh-CN    # 定向编译特定语言版本
 cargo fy-docs --open          # 构建完成后在浏览器中打开页面
 cargo fy-docs --root D:\Code  # 显式指定 Typst 编译沙盒根目录
+cargo fy-docs --with-pdf      # html/dev：同时编译打印版 PDF
 cargo fy-docs dev --port 8181 # 自定义开发服务器端口
+cargo fy-docs dev --no-open   # dev 模式下不自动打开浏览器
 ```
 
 ## 输出位置
@@ -65,7 +67,7 @@ cargo fy-docs dev --port 8181 # 自定义开发服务器端口
 | 产物 | 位置 |
 |---|---|
 | 离线 HTML 阅读页 | `docs/target/index.html` |
-| 打印版 PDF | `docs/release/<package>_v<version>_specification.pdf` |
+| 打印版 PDF | `docs/release/<package>_v<version>[_<lang>]_specification.pdf` |
 
 包名和版本优先读取 `Cargo.toml` 的 `[package]`，并支持 Cargo workspace 的继承字段。若清单不包含 package 元数据，则回退到文档中的 `version:` 字段，最后回退为 `0.1.0`。
 
@@ -109,7 +111,7 @@ cargo fy-docs dev --port 8181 # 自定义开发服务器端口
 
 ## 环境要求
 
-系统 `PATH` 中需要可用的 `typst`，并支持 HTML 导出（Typst 0.13 或更高版本）。fy-docs 基于 Typst 0.15 开发与测试。
+系统 `PATH` 中需要可用的 `typst`（Typst 0.14 或更高版本 —— fy-docs 传入的 `--pdf-standard 2.0` 参数要求该版本起才受支持）。fy-docs 基于 Typst 0.15 开发与测试。
 
 ## 更新日志
 

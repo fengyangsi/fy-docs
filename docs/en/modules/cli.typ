@@ -21,6 +21,10 @@ cargo fy-docs init   # Scaffold a self-contained docs/ directory
   `init` is the only command that does not require an existing `docs/` folder: it creates `docs/`, starter `main.typ`, embedded `fy-spec/lib.typ`, and appends `/docs/target/` and `/docs/release/` to `.gitignore`.
 ]
 
+#contract[
+  Every compiling command pre-checks the `typst` CLI before running: a missing binary or a version older than 0.14 (the first release accepting `--pdf-standard 2.0`) aborts immediately with an actionable message.
+]
+
 #invariant[
-  `cargo fy-docs` default command, `build`, `html`, and `pdf` commands are idempotent, non-blocking builds that exit with code `0` upon completion, never hanging CI pipelines.
+  `cargo fy-docs` default command, `build`, `html`, and `pdf` commands are idempotent, non-blocking builds that never hang CI pipelines. They exit with code `0` only when every compilation succeeds; a compile failure exits non-zero so pipelines catch broken documents. The `dev` server instead survives failures and renders them as error pages.
 ]
