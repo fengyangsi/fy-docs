@@ -194,8 +194,16 @@ fn detect_language_targets(
         }
     }
 
-    // Sort sub-targets deterministically
-    sub_targets.sort_by(|a, b| a.lang.cmp(&b.lang));
+    // Sort sub-targets: prefer "zh-CN" / "zh" first, then alphabetical
+    sub_targets.sort_by(|a, b| {
+        let a_is_zh = a.lang.eq_ignore_ascii_case("zh-cn") || a.lang.eq_ignore_ascii_case("zh");
+        let b_is_zh = b.lang.eq_ignore_ascii_case("zh-cn") || b.lang.eq_ignore_ascii_case("zh");
+        match (a_is_zh, b_is_zh) {
+            (true, false) => std::cmp::Ordering::Less,
+            (false, true) => std::cmp::Ordering::Greater,
+            _ => a.lang.cmp(&b.lang),
+        }
+    });
 
     let primary_entry;
     if !sub_targets.is_empty() {

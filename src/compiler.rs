@@ -120,9 +120,15 @@ fn generate(project: &Project, with_pdf: bool, lang_filter: Option<&str>) -> Res
     }
 
     // If no index.html was directly generated (e.g. only docs/zh-CN/main.typ exists),
-    // copy the first rendered language page as the default index.html.
+    // copy the preferred rendered language page as the default index.html.
     if !has_index && !rendered_pages.is_empty() {
-        let (first_target, title, body) = &rendered_pages[0];
+        let preferred_index = rendered_pages
+            .iter()
+            .position(|(t, _, _)| {
+                t.lang.eq_ignore_ascii_case("zh-cn") || t.lang.eq_ignore_ascii_case("zh")
+            })
+            .unwrap_or(0);
+        let (first_target, title, body) = &rendered_pages[preferred_index];
         let default_page = crate::assets::doc_page(
             title,
             &project.name,
