@@ -16,6 +16,7 @@
 ├── target/                  # Cargo 程序构建产物
 └── docs/
     ├── main.typ             # Typst 文档入口
+    ├── fy-spec/             # 内嵌的规格模板库（lib.typ，完全自包含）
     ├── modules/             # 规格源码，按实现模块组织
     ├── target/              # fy-docs 的 HTML 阅读页生成物
     └── release/             # 版本化 PDF 生成物

@@ -7,6 +7,11 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本遵循 [语义化版本 2.0.0](https://semver.org/lang/zh-CN/)。
 
+## [0.1.3] - 2026-08-30
+
+### 文档
+- 在 `README.md` 及模块规格说明书中完整补充记录了 `docs/fy-spec/` 内嵌模板目录结构及其自包含设计规范。
+
 ## [0.1.2] - 2026-08-30
 
 ### 新增

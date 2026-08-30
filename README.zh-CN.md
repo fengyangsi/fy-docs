@@ -21,7 +21,7 @@ cargo install fy-docs
 ## 用法
 
 ```powershell
-# 初始化 docs/ 目录、模板与 main.typ 入口。
+# 初始化 docs/ 目录：自动生成 main.typ 入口、内嵌 fy-spec 模板库与 modules/ 目录。
 cargo fy-docs init
 
 # 交互预览：构建 HTML、打开浏览器并监听 .typ 文件。
@@ -63,10 +63,13 @@ cargo fy-docs --no-open
 ├── target/                  # 程序构建产物
 └── docs/
     ├── main.typ             # Typst 文档入口
+    ├── fy-spec/             # 内嵌的规格模板库（lib.typ，完全自包含）
     ├── modules/             # 按模块组织的规格源码
-    ├── target/              # 生成的 HTML、CSS、JavaScript
-    └── release/             # 版本化的规格书 PDF
+    ├── target/              # 生成物：HTML、CSS、JavaScript（Git 忽略）
+    └── release/             # 生成物：版本化的规格书 PDF（Git 忽略）
 ```
+
+`docs/fy-spec/` 存放内嵌的完整排版规范模板（ISO B5 版式、语义契约框、状态徽章等），确保每个项目的规格文档完全自包含，在任何环境下均可独立编译与渲染，不依赖外部或系统级路径。
 
 `docs/target/` 与 `docs/release/` 都是生成物，应当由 Git 忽略；它们与 Cargo 的 `target/release/` 程序构建产物保持分离。
 

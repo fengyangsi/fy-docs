@@ -21,7 +21,7 @@ The installed executable is `cargo-fy-docs`, which Cargo discovers as the `cargo
 ## Usage
 
 ```powershell
-# Scaffold a docs/ directory with a starter main.typ and bundled template.
+# Scaffold a docs/ directory with a starter main.typ, embedded fy-spec template, and modules/ folder.
 cargo fy-docs init
 
 # Interactive preview: build HTML, open the browser, and watch .typ files.
@@ -63,10 +63,13 @@ project/
 ├── target/                  # Program build artifacts
 └── docs/
     ├── main.typ             # Typst entry point
+    ├── fy-spec/             # Embedded specification template library (lib.typ, self-contained)
     ├── modules/             # Specification source, organized by module
-    ├── target/              # Generated HTML, CSS, and JavaScript
-    └── release/             # Versioned specification PDFs
+    ├── target/              # Generated HTML, CSS, and JavaScript (Git ignored)
+    └── release/             # Versioned specification PDFs (Git ignored)
 ```
+
+`docs/fy-spec/` contains the embedded styling templates (ISO B5 layout, semantic contract boxes, badges), ensuring specification documents are fully self-contained and reproducible without external dependencies.
 
 `docs/target/` and `docs/release/` are generated artifacts and should be ignored by Git. They are intentionally separate from Cargo's `target/release/` program artifacts.
 
