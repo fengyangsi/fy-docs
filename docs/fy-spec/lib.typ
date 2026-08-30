@@ -362,77 +362,122 @@
   }
 }
 
-#let contract(body, title: "强类型接口与规格契约 (Contract)") = callout(
-  body,
-  title: title,
-  icon: "▣",
-  kind: "contract",
-  accent: palette.contract.accent,
-  background: palette.contract.bg,
-  border: palette.contract.border,
-)
+#let contract(body, title: auto) = context {
+  let is-zh = text.lang == "zh"
+  let default-title = if is-zh { "强类型接口与规格契约 (Contract)" } else { "Interface Contract" }
+  let effective-title = if title == auto { default-title } else { title }
+  callout(
+    body,
+    title: effective-title,
+    icon: "▣",
+    kind: "contract",
+    accent: palette.contract.accent,
+    background: palette.contract.bg,
+    border: palette.contract.border,
+  )
+}
 
-#let invariant(body, title: "核心不变性与安全约束 (Invariant)") = callout(
-  body,
-  title: title,
-  icon: "◆",
-  kind: "invariant",
-  accent: palette.invariant.accent,
-  background: palette.invariant.bg,
-  border: palette.invariant.border,
-)
+#let invariant(body, title: auto) = context {
+  let is-zh = text.lang == "zh"
+  let default-title = if is-zh { "核心不变性与安全约束 (Invariant)" } else { "Core Invariant" }
+  let effective-title = if title == auto { default-title } else { title }
+  callout(
+    body,
+    title: effective-title,
+    icon: "◆",
+    kind: "invariant",
+    accent: palette.invariant.accent,
+    background: palette.invariant.bg,
+    border: palette.invariant.border,
+  )
+}
 
-#let logic-box(body, title: "形式逻辑与推理规则 (Logical Rules)") = callout(
-  body,
-  title: title,
-  icon: "◇",
-  kind: "logic",
-)
+#let logic-box(body, title: auto) = context {
+  let is-zh = text.lang == "zh"
+  let default-title = if is-zh { "形式逻辑与推理规则 (Logical Rules)" } else { "Logical Rules" }
+  let effective-title = if title == auto { default-title } else { title }
+  callout(
+    body,
+    title: effective-title,
+    icon: "◇",
+    kind: "logic",
+  )
+}
 
-#let proof-box(body, title: "证明策略与启发式搜索 (Proof Strategy)") = callout(
-  body,
-  title: title,
-  icon: "◇",
-  kind: "proof",
-)
+#let proof-box(body, title: auto) = context {
+  let is-zh = text.lang == "zh"
+  let default-title = if is-zh { "证明策略与启发式搜索 (Proof Strategy)" } else { "Proof Strategy" }
+  let effective-title = if title == auto { default-title } else { title }
+  callout(
+    body,
+    title: effective-title,
+    icon: "◇",
+    kind: "proof",
+  )
+}
 
-#let math-box(body, title: "数学推导与数值模型 (Mathematical Model)") = callout(
-  body,
-  title: title,
-  icon: "◇",
-  kind: "math",
-)
+#let math-box(body, title: auto) = context {
+  let is-zh = text.lang == "zh"
+  let default-title = if is-zh { "数学推导与数值模型 (Mathematical Model)" } else { "Mathematical Model" }
+  let effective-title = if title == auto { default-title } else { title }
+  callout(
+    body,
+    title: effective-title,
+    icon: "◇",
+    kind: "math",
+  )
+}
 
-#let geom-box(body, title: "几何结构与空间模型 (Geometry Model)") = callout(
-  body,
-  title: title,
-  icon: "◇",
-  kind: "geom",
-)
+#let geom-box(body, title: auto) = context {
+  let is-zh = text.lang == "zh"
+  let default-title = if is-zh { "几何结构与空间模型 (Geometry Model)" } else { "Geometry Model" }
+  let effective-title = if title == auto { default-title } else { title }
+  callout(
+    body,
+    title: effective-title,
+    icon: "◇",
+    kind: "geom",
+  )
+}
 
-#let axiom-box(body, title: "几何公理与推演法则 (Geometric Axiom)") = callout(
-  body,
-  title: title,
-  icon: "◇",
-  kind: "axiom",
-)
+#let axiom-box(body, title: auto) = context {
+  let is-zh = text.lang == "zh"
+  let default-title = if is-zh { "几何公理与推演法则 (Geometric Axiom)" } else { "Geometric Axiom" }
+  let effective-title = if title == auto { default-title } else { title }
+  callout(
+    body,
+    title: effective-title,
+    icon: "◇",
+    kind: "axiom",
+  )
+}
 
-#let motion-box(body, title: "运动学模型与时序法则 (Motion Model)") = callout(
-  body,
-  title: title,
-  icon: "◇",
-  kind: "motion",
-)
+#let motion-box(body, title: auto) = context {
+  let is-zh = text.lang == "zh"
+  let default-title = if is-zh { "运动学模型与时序法则 (Motion Model)" } else { "Motion Model" }
+  let effective-title = if title == auto { default-title } else { title }
+  callout(
+    body,
+    title: effective-title,
+    icon: "◇",
+    kind: "motion",
+  )
+}
 
-#let example-box(body, title: "规格用例与状态验证 (Example & Verification)") = callout(
-  body,
-  title: title,
-  icon: "●",
-  kind: "example",
-  accent: palette.example.accent,
-  background: palette.example.bg,
-  border: palette.example.border,
-)
+#let example-box(body, title: auto) = context {
+  let is-zh = text.lang == "zh"
+  let default-title = if is-zh { "规格用例与状态验证 (Example & Verification)" } else { "Specification Example" }
+  let effective-title = if title == auto { default-title } else { title }
+  callout(
+    body,
+    title: effective-title,
+    icon: "●",
+    kind: "example",
+    accent: palette.example.accent,
+    background: palette.example.bg,
+    border: palette.example.border,
+  )
+}
 
 #let status-badge(status: "待确立", phase: "阶段 1") = {
   let pending = status.contains("待") or status.contains("pending") or status.contains("WIP")
