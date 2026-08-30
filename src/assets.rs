@@ -163,12 +163,31 @@ fn escape_attribute(text: &str) -> String {
     escape(text).replace('"', "&quot;")
 }
 
-/// Renders a tiny (~500B) client-side language routing landing page.
+/// Renders a tiny (~500B) client-side language routing landing page with dynamic matching.
 pub fn redirect_page(all_targets: &[LanguageTarget]) -> String {
-    let distinct: Vec<&LanguageTarget> = all_targets
-        .iter()
-        .filter(|t| !t.lang.is_empty())
-        .collect();
+    let distinct: Vec<&LanguageTarget> =
+        all_targets.iter().filter(|t| !t.lang.is_empty()).collect();
+
+    let mut map_entries = Vec::new();
+    for t in &distinct {
+        let lang_lower = t.lang.to_lowercase();
+        let file = &t.html_file_name;
+        map_entries.push(format!(
+            r#""{}":"{}""#,
+            escape_attribute(&lang_lower),
+            escape_attribute(file)
+        ));
+        if let Some((base, _)) = lang_lower.split_once('-') {
+            if !base.is_empty() {
+                map_entries.push(format!(
+                    r#""{}":"{}""#,
+                    escape_attribute(base),
+                    escape_attribute(file)
+                ));
+            }
+        }
+    }
+    let map_json = format!("{{{}}}", map_entries.join(","));
 
     let default_target = distinct
         .iter()
@@ -201,12 +220,15 @@ pub fn redirect_page(all_targets: &[LanguageTarget]) -> String {
   var stored = null;
   try {{ stored = localStorage.getItem('fydocs-lang'); }} catch (_) {{}}
   if (stored) {{ location.replace(stored); return; }}
-  var lang = (navigator.language || '').toLowerCase();
-  if (lang.indexOf('zh') === 0) {{
-    location.replace('{default_target}');
-  }} else {{
-    location.replace('index_en.html');
+  var map = {map_json};
+  var userLangs = (navigator.languages && navigator.languages.length) ? navigator.languages : [navigator.language || ''];
+  for (var i = 0; i < userLangs.length; i++) {{
+    var l = (userLangs[i] || '').toLowerCase();
+    if (map[l]) {{ location.replace(map[l]); return; }}
+    var base = l.split('-')[0];
+    if (map[base]) {{ location.replace(map[base]); return; }}
   }}
+  location.replace('{default_target}');
 }})();
 </script>
 <noscript><meta http-equiv="refresh" content="0; url={default_target}"></noscript>
@@ -256,5 +278,39 @@ mod tests {
     fn localizes_controls_for_chinese_documents() {
         let page = doc_page("中文文档", "fy-x", None, "<h1>内容</h1>", None, &[]);
         assert!(page.contains("<html lang=\"zh-CN\">"));
+    }
+
+    #[test]
+    fn redirect_page_generates_dynamic_json_map() {
+        let targets = vec![
+            LanguageTarget {
+                lang: "zh-CN".to_owned(),
+                display_name: "简体中文".to_owned(),
+                entry: std::path::PathBuf::from("docs/zh-CN/main.typ"),
+                html_file_name: "index_zh-CN.html".to_owned(),
+                pdf_file_name: "fy-x_v0.1.0_zh-CN_specification.pdf".to_owned(),
+            },
+            LanguageTarget {
+                lang: "ja".to_owned(),
+                display_name: "日本語".to_owned(),
+                entry: std::path::PathBuf::from("docs/ja/main.typ"),
+                html_file_name: "index_ja.html".to_owned(),
+                pdf_file_name: "fy-x_v0.1.0_ja_specification.pdf".to_owned(),
+            },
+            LanguageTarget {
+                lang: "en".to_owned(),
+                display_name: "English".to_owned(),
+                entry: std::path::PathBuf::from("docs/en/main.typ"),
+                html_file_name: "index_en.html".to_owned(),
+                pdf_file_name: "fy-x_v0.1.0_en_specification.pdf".to_owned(),
+            },
+        ];
+        let html = redirect_page(&targets);
+        assert!(html.contains(r#""zh-cn":"index_zh-CN.html""#));
+        assert!(html.contains(r#""zh":"index_zh-CN.html""#));
+        assert!(html.contains(r#""ja":"index_ja.html""#));
+        assert!(html.contains(r#""en":"index_en.html""#));
+        assert!(html.contains(r#"<a href="index_zh-CN.html">简体中文</a>"#));
+        assert!(html.contains(r#"<a href="index_ja.html">日本語</a>"#));
     }
 }
