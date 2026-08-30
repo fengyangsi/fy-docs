@@ -227,4 +227,107 @@ mod tests {
             "&lt;unknown&gt; &amp; &lt;vars&gt;"
         );
     }
+
+    #[test]
+    fn ensure_gitignore_creates_and_updates_entries() {
+        let temp = std::env::temp_dir().join(format!("fy-docs-ignore-test-{}", std::process::id()));
+        let docs = temp.join("docs");
+        std::fs::create_dir_all(&docs).unwrap();
+        let project = Project {
+            name: "demo".to_owned(),
+            version: "0.1.0".to_owned(),
+            repository: None,
+            entry: docs.join("main.typ"),
+            docs_dir: docs.clone(),
+            root: temp.clone(),
+            target_dir: docs.join("target"),
+            release_dir: docs.join("release"),
+            watch_dirs: Vec::new(),
+        };
+
+        // 1. File does not exist: creates with entry
+        ensure_gitignore_ignores(&project, ["/docs/target/"]);
+        let gitignore = temp.join(".gitignore");
+        let content = std::fs::read_to_string(&gitignore).unwrap();
+        assert!(content.contains("/docs/target/"));
+
+        // 2. Already present: does not duplicate
+        ensure_gitignore_ignores(&project, ["/docs/target/"]);
+        let content2 = std::fs::read_to_string(&gitignore).unwrap();
+        assert_eq!(content, content2);
+
+        // 3. Append another entry
+        ensure_gitignore_ignores(&project, ["/docs/release/"]);
+        let content3 = std::fs::read_to_string(&gitignore).unwrap();
+        assert!(content3.contains("/docs/target/"));
+        assert!(content3.contains("/docs/release/"));
+
+        let _ = std::fs::remove_dir_all(temp);
+    }
+
+    #[test]
+    fn write_error_page_outputs_escaped_html() {
+        let temp = std::env::temp_dir().join(format!("fy-docs-err-test-{}", std::process::id()));
+        let docs = temp.join("docs");
+        std::fs::create_dir_all(&docs).unwrap();
+        let project = Project {
+            name: "err_demo".to_owned(),
+            version: "0.1.0".to_owned(),
+            repository: Some("https://github.com/org/err_demo".to_owned()),
+            entry: docs.join("main.typ"),
+            docs_dir: docs.clone(),
+            root: temp.clone(),
+            target_dir: docs.join("target"),
+            release_dir: docs.join("release"),
+            watch_dirs: Vec::new(),
+        };
+
+        write_error_page(&project, "error: <type mismatch> in line 42").unwrap();
+        let index = std::fs::read_to_string(docs.join("target").join(INDEX_FILE)).unwrap();
+        assert!(index.contains("&lt;type mismatch&gt;"));
+        assert!(index.contains("fy-error"));
+
+        let _ = std::fs::remove_dir_all(temp);
+    }
+
+    #[test]
+    fn generate_into_handles_success_and_failure() {
+        let temp = std::env::temp_dir().join(format!("fy-docs-gen-test-{}", std::process::id()));
+        let docs = temp.join("docs");
+        std::fs::create_dir_all(&docs).unwrap();
+        let main_typ = docs.join("main.typ");
+        std::fs::write(&main_typ, "= Test Document\n\nHello world!\n").unwrap();
+
+        let project = Project {
+            name: "gen_demo".to_owned(),
+            version: "0.1.0".to_owned(),
+            repository: None,
+            entry: main_typ.clone(),
+            docs_dir: docs.clone(),
+            root: temp.clone(),
+            target_dir: docs.join("target"),
+            release_dir: docs.join("release"),
+            watch_dirs: Vec::new(),
+        };
+        let state = AppState::new(project);
+
+        // 1. Success case
+        generate_into(&state, true);
+        assert!(docs.join("target").join(INDEX_FILE).exists());
+        assert!(docs.join("target").join(SKIN_FILE).exists());
+        assert!(docs.join("target").join(VIEWER_JS_FILE).exists());
+        assert!(
+            docs.join("release")
+                .join("gen_demo_v0.1.0_specification.pdf")
+                .exists()
+        );
+
+        // 2. Syntax error case: write_error_page should be triggered gracefully
+        std::fs::write(&main_typ, "#undefined_function_call()\n").unwrap();
+        generate_into(&state, false);
+        let error_html = std::fs::read_to_string(docs.join("target").join(INDEX_FILE)).unwrap();
+        assert!(error_html.contains("fy-error"));
+
+        let _ = std::fs::remove_dir_all(temp);
+    }
 }

@@ -7,6 +7,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.4] - 2026-08-30
+
+### Added
+- Automated multi-platform binary releases across 9 architectures (Linux GNU/musl x86_64/ARM64, macOS Apple Silicon/Intel, Windows x86_64/ARM64, FreeBSD x86_64).
+- Automated build and attachment of versioned specification PDF documents (`fy-docs_v<version>_specification.pdf`) directly to GitHub Releases.
+
+
+### Testing
+- Expanded test coverage across all modules (server endpoints, project detection, watcher, compiler, scaffold, and CLI dispatcher), raising code line coverage to 92%+.
+
+
 ## [0.1.3] - 2026-08-30
 
 ### Documentation

@@ -297,4 +297,77 @@ mod tests {
             "https://codeberg.org/fengyangsi/fy-docs"
         ));
     }
+
+    #[test]
+    fn detect_fails_when_main_typ_missing() {
+        let temp = std::env::temp_dir().join(format!("fy-docs-no-main-{}", std::process::id()));
+        std::fs::create_dir_all(&temp).unwrap();
+        assert!(detect(&temp, None).is_err());
+        let _ = std::fs::remove_dir_all(temp);
+    }
+
+    #[test]
+    fn detect_succeeds_with_minimal_project() {
+        let temp = std::env::temp_dir().join(format!("fy-docs-detect-{}", std::process::id()));
+        let docs = temp.join("docs");
+        std::fs::create_dir_all(&docs).unwrap();
+        std::fs::write(
+            docs.join("main.typ"),
+            "#import \"fy-spec/lib.typ\": *\n#show: project_book.with(title: \"Doc\", version: \"0.3.1\")\n",
+        )
+        .unwrap();
+
+        let proj = detect(&temp, None).unwrap();
+        assert_eq!(proj.name, temp.file_name().unwrap().to_str().unwrap());
+        assert_eq!(proj.version, "0.3.1");
+        assert_eq!(proj.root, temp);
+
+        // With explicit root
+        let explicit_root = temp.join("custom_root");
+        std::fs::create_dir_all(&explicit_root).unwrap();
+        let proj2 = detect(&temp, Some(&explicit_root)).unwrap();
+        assert_eq!(proj2.root, explicit_root.canonicalize().unwrap());
+
+        let _ = std::fs::remove_dir_all(temp);
+    }
+
+    #[test]
+    fn main_typ_version_fallback() {
+        let temp = std::env::temp_dir().join(format!("fy-docs-ver-{}", std::process::id()));
+        std::fs::create_dir_all(&temp).unwrap();
+        let entry = temp.join("main.typ");
+        std::fs::write(&entry, "version: \"1.9.4\"").unwrap();
+        assert_eq!(main_typ_version(&entry), Some("1.9.4".to_owned()));
+
+        std::fs::write(&entry, "no version here").unwrap();
+        assert_eq!(main_typ_version(&entry), None);
+        let _ = std::fs::remove_dir_all(temp);
+    }
+
+    #[test]
+    fn detects_absolute_imports_and_resolves_root() {
+        let temp = std::env::temp_dir().join(format!("fy-docs-import-{}", std::process::id()));
+        let docs = temp.join("docs");
+        std::fs::create_dir_all(&docs).unwrap();
+        std::fs::write(
+            docs.join("main.typ"),
+            "// comment with \"/fake.typ\"\n#import \"/shared/lib.typ\": *\n",
+        )
+        .unwrap();
+
+        let imports = absolute_imports(&docs);
+        assert_eq!(imports, vec!["shared/lib.typ".to_owned()]);
+
+        // When directory doesn't exist on disk, detect_root returns Err
+        assert!(detect_root(&temp, &imports).is_err());
+
+        // When shared exists, detect_root resolves closest root
+        let shared = temp.join("shared");
+        std::fs::create_dir_all(&shared).unwrap();
+        std::fs::write(shared.join("lib.typ"), "content").unwrap();
+        let root2 = detect_root(&temp, &imports).unwrap();
+        assert_eq!(root2, temp);
+
+        let _ = std::fs::remove_dir_all(temp);
+    }
 }

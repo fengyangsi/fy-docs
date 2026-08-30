@@ -12,11 +12,23 @@ A Cargo subcommand for building and previewing Typst specification documents. Ru
 
 ## Installation
 
+### Via Cargo (Recommended for Rust developers)
+
 ```powershell
 cargo install fy-docs
 ```
 
 The installed executable is `cargo-fy-docs`, which Cargo discovers as the `cargo fy-docs` command.
+
+### Pre-built Binaries (Direct Download)
+
+Pre-compiled binaries for **Windows (x64 / ARM64)**, **macOS (Apple Silicon / Intel)**, **Linux (x64 / ARM64, musl static)**, and **FreeBSD (x64)** are available on the [GitHub Releases](https://github.com/fengyangsi/fy-docs/releases) page. Download the archive for your platform, extract `cargo-fy-docs` into a directory on your `PATH`, and run:
+
+
+```powershell
+cargo-fy-docs --version
+```
+
 
 ## Usage
 
@@ -77,6 +89,11 @@ project/
 
 `typst` must be available on `PATH` with HTML export support (Typst 0.13 or later). fy-docs is developed and tested against Typst 0.15.
 
+## Changelog
+
+Detailed release notes and migration guides for each version are documented in [CHANGELOG.md](CHANGELOG.md).
+
 ## License
 
 Dual-licensed under [MIT](LICENSE-MIT) OR [Apache-2.0](LICENSE-APACHE), at your option.
+

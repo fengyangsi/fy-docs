@@ -249,15 +249,17 @@ dependencies = [
 
 [[package]]
 name = "fy-docs"
-version = "0.1.3"
+version = "0.1.4"
 dependencies = [
  "anyhow",
  "axum",
  "clap",
+ "http-body-util",
  "notify",
  "open",
  "tokio",
  "toml",
+ "tower",
  "tower-http",
 ]
 

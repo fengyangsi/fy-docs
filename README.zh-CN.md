@@ -12,11 +12,23 @@
 
 ## 安装
 
+### 通过 Cargo 安装（推荐 Rust 开发者）
+
 ```powershell
 cargo install fy-docs
 ```
 
 安装后得到的可执行文件名为 `cargo-fy-docs`，Cargo 会将其发现为 `cargo fy-docs` 命令。
+
+### 下载预编译二进制程序（开箱即用）
+
+在 [GitHub Releases](https://github.com/fengyangsi/fy-docs/releases) 发布页面中，为 **Windows (x64 / ARM64)**、**macOS (Apple Silicon / Intel)**、**Linux (x64 / ARM64, musl 静态单文件)** 及 **FreeBSD (x64)** 提供了预编译的二进制包。下载对应平台的压缩包并解压至系统 `PATH` 路径中即可直接使用：
+
+
+```powershell
+cargo-fy-docs --version
+```
+
 
 ## 用法
 
@@ -77,6 +89,11 @@ cargo fy-docs --no-open
 
 系统 `PATH` 中需要可用的 `typst`，并支持 HTML 导出（Typst 0.13 或更高版本）。fy-docs 基于 Typst 0.15 开发与测试。
 
+## 更新日志
+
+各版本的详细更新说明与变更记录请参阅 [CHANGELOG.zh-CN.md](CHANGELOG.zh-CN.md)。
+
 ## 许可证
 
 双许可：[MIT](LICENSE-MIT) 或 [Apache-2.0](LICENSE-APACHE)，使用者任选其一。
+

@@ -1,0 +1,137 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract Bilingual Release Notes
+        run: |
+          python3 - << 'EOF'
+          import os
+
+          tag = os.environ.get("GITHUB_REF_NAME", "")
+          version = tag.lstrip("v")
+
+          def extract_section(file_path, target_version):
+              lines = []
+              recording = False
+              try:
+                  with open(file_path, 'r', encoding='utf-8') as f:
+                      for line in f:
+                          stripped = line.strip()
+                          if stripped.startswith('## ['):
+                              try:
+                                  ver_in_brackets = stripped.split('[', 1)[1].split(']', 1)[0].strip()
+                              except IndexError:
+                                  ver_in_brackets = ''
+                              
+                              if ver_in_brackets == target_version:
+                                  recording = True
+                                  continue
+                              elif recording:
+                                  break
+                          elif recording:
+                              lines.append(line)
+              except Exception:
+                  pass
+              return ''.join(lines).strip()
+
+          en_notes = extract_section('CHANGELOG.md', version)
+          zh_notes = extract_section('CHANGELOG.zh-CN.md', version)
+
+          sections = []
+          if en_notes:
+              sections.append(f"## English\n\n{en_notes}")
+          if zh_notes:
+              sections.append(f"## 简体中文\n\n{zh_notes}")
+
+          body = "\n\n---\n\n".join(sections) if sections else "See [CHANGELOG.md](https://github.com/fengyangsi/fy-docs/blob/main/CHANGELOG.md) for details."
+
+          with open('RELEASE_NOTES.md', 'w', encoding='utf-8') as out:
+              out.write(body + '\n')
+          EOF
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Typst
+        uses: typst-community/setup-typst@v3
+
+      - name: Build Specification PDF with fy-docs
+        run: cargo run -- pdf
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: false
+          prerelease: false
+          body_path: RELEASE_NOTES.md
+          generate_release_notes: false
+          files: |
+            docs/release/*.pdf
+
+      - name: Ensure Release Notes Updated
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release edit "${{ github.ref_name }}" --notes-file RELEASE_NOTES.md
+
+  upload-assets:
+    name: Build and Upload (${{ matrix.target }})
+    needs: create-release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux x86_64
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+          # Linux ARM64
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-latest
+          # macOS Intel & Apple Silicon
+          - target: x86_64-apple-darwin
+            os: macos-13
+          - target: aarch64-apple-darwin
+            os: macos-latest
+          # Windows
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+          - target: aarch64-pc-windows-msvc
+            os: windows-latest
+          # FreeBSD
+          - target: x86_64-unknown-freebsd
+            os: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Build and upload release binary
+        uses: taiki-e/upload-rust-binary-action@v1
+        with:
+          bin: cargo-fy-docs
+          target: ${{ matrix.target }}
+          tar: unix
+          zip: windows
+          token: ${{ secrets.GITHUB_TOKEN }}
+

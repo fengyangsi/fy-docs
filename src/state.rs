@@ -79,4 +79,38 @@ mod tests {
     fn preserves_native_unix_paths() {
         assert_eq!(display_path(Path::new("/tmp/fy-docs")), "/tmp/fy-docs");
     }
+
+    #[test]
+    fn app_state_tracks_and_bumps_build_id() {
+        let temp = std::env::temp_dir().join(format!("fy-docs-state-test-{}", std::process::id()));
+        std::fs::create_dir_all(&temp).unwrap();
+        let project = Project {
+            name: "test".to_owned(),
+            version: "0.1.0".to_owned(),
+            repository: None,
+            entry: temp.join("main.typ"),
+            docs_dir: temp.clone(),
+            root: temp.clone(),
+            target_dir: temp.clone(),
+            release_dir: temp.clone(),
+            watch_dirs: Vec::new(),
+        };
+        let state = AppState::new(project);
+        assert_eq!(state.current_build_id(), 1);
+
+        state.write_build();
+        let build_file = temp.join(crate::compiler::BUILD_FILE);
+        assert_eq!(std::fs::read_to_string(&build_file).unwrap(), "1");
+
+        state.bump_build();
+        assert_eq!(state.current_build_id(), 2);
+        assert_eq!(std::fs::read_to_string(&build_file).unwrap(), "2");
+
+        let _ = std::fs::remove_dir_all(temp);
+    }
+
+    #[test]
+    fn log_executes_safely() {
+        log("test log output");
+    }
 }

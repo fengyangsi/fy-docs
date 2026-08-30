@@ -9,7 +9,7 @@ mod watcher;
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use std::ffi::{OsStr, OsString};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use crate::state::AppState;
@@ -58,13 +58,16 @@ enum Command {
 async fn main() -> Result<()> {
     let cli = Cli::parse_from(cargo_external_args(std::env::args_os()));
     let cwd = std::env::current_dir()?.canonicalize()?;
+    dispatch(cli, &cwd).await
+}
 
+async fn dispatch(cli: Cli, cwd: &Path) -> Result<()> {
     // Init does not require an existing docs/ directory.
     if matches!(cli.command, Some(Command::Init)) {
-        return scaffold::init(&cwd);
+        return scaffold::init(cwd);
     }
 
-    let project = project::detect(&cwd, cli.root.as_deref())?;
+    let project = project::detect(cwd, cli.root.as_deref())?;
     let state = Arc::new(AppState::new(project));
 
     match cli.command {
@@ -160,5 +163,84 @@ mod tests {
     fn keeps_direct_executable_arguments() {
         let args = cargo_external_args([OsString::from("cargo-fy-docs"), OsString::from("build")]);
         assert_eq!(args, ["cargo-fy-docs", "build"]);
+    }
+
+    #[test]
+    fn cli_parses_all_subcommands_and_flags() {
+        use clap::Parser;
+
+        // 1. Preview default
+        let cli = Cli::parse_from(["cargo-fy-docs", "--port", "9090", "--no-open"]);
+        assert_eq!(cli.port, 9090);
+        assert!(cli.no_open);
+        assert!(cli.command.is_none());
+
+        // 2. init
+        let cli = Cli::parse_from(["cargo-fy-docs", "init"]);
+        assert!(matches!(cli.command, Some(Command::Init)));
+
+        // 3. build
+        let cli = Cli::parse_from(["cargo-fy-docs", "build", "--with-pdf"]);
+        assert!(matches!(cli.command, Some(Command::Build)));
+        assert!(cli.with_pdf);
+
+        // 4. pdf
+        let cli = Cli::parse_from(["cargo-fy-docs", "pdf"]);
+        assert!(matches!(cli.command, Some(Command::Pdf)));
+    }
+
+    #[tokio::test]
+    async fn bind_allocates_available_listener() {
+        let listener = bind(18585).await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        assert!(port >= 18585);
+    }
+
+    #[tokio::test]
+    async fn dispatch_executes_build_pdf_and_init_commands() {
+        let temp = std::env::temp_dir().join(format!("fy-docs-main-run-{}", std::process::id()));
+        let docs = temp.join("docs");
+        std::fs::create_dir_all(&docs).unwrap();
+        std::fs::write(docs.join("main.typ"), "= Test Main\n\nMain content\n").unwrap();
+
+        // 1. Build command (with PDF)
+        let cli_build = Cli {
+            root: Some(temp.clone()),
+            with_pdf: true,
+            port: 8181,
+            no_open: true,
+            command: Some(Command::Build),
+        };
+        let res_build = dispatch(cli_build, &temp).await;
+        assert!(res_build.is_ok());
+        assert!(docs.join("target").join("index.html").exists());
+
+        // 2. Pdf command
+        let cli_pdf = Cli {
+            root: Some(temp.clone()),
+            with_pdf: false,
+            port: 8181,
+            no_open: true,
+            command: Some(Command::Pdf),
+        };
+        let res_pdf = dispatch(cli_pdf, &temp).await;
+        assert!(res_pdf.is_ok());
+
+        // 3. Init command on empty dir
+        let temp_init =
+            std::env::temp_dir().join(format!("fy-docs-main-init-{}", std::process::id()));
+        std::fs::create_dir_all(&temp_init).unwrap();
+        let cli_init = Cli {
+            root: None,
+            with_pdf: false,
+            port: 8181,
+            no_open: true,
+            command: Some(Command::Init),
+        };
+        assert!(dispatch(cli_init, &temp_init).await.is_ok());
+        assert!(temp_init.join("docs").join("main.typ").exists());
+
+        let _ = std::fs::remove_dir_all(temp);
+        let _ = std::fs::remove_dir_all(temp_init);
     }
 }

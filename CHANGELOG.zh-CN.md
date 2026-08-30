@@ -7,6 +7,16 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本遵循 [语义化版本 2.0.0](https://semver.org/lang/zh-CN/)。
 
+## [0.1.4] - 2026-08-30
+
+### 新增
+- 支持 9 大平台架构预编译二进制程序全自动构建与发布（Linux GNU/musl x86_64/ARM64、macOS Apple Silicon/Intel、Windows x86_64/ARM64、FreeBSD x86_64）。
+- GitHub Release 自动编译并发布版本对应的官方规格说明书 PDF 文档（`fy-docs_v<版本>_specification.pdf`）。
+
+
+### 测试
+- 扩充全模块测试套件（服务器端点、工程探测、文件监听、编译器、脚手架与命令行调度），单测覆盖率大幅提升至 92%+。
+
 ## [0.1.3] - 2026-08-30
 
 ### 文档
