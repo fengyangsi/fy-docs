@@ -92,6 +92,7 @@ pub fn compile_pdf(project: &Project) -> Result<PathBuf> {
     run(Command::new("typst")
         .args(["compile", "--root"])
         .arg(&project.root)
+        .args(["--pdf-standard", "2.0"])
         .arg(&project.entry)
         .arg(project.release_dir.join(&pdf_file)))
     .context("typst PDF export failed")?;

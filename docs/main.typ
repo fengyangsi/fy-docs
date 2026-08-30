@@ -3,7 +3,7 @@
 #show: project_book.with(
   title: "fy-docs 规格说明书",
   subtitle: "Typst 规格文档的本地构建、阅读与实时预览工具",
-  version: "0.1.4",
+  version: "0.1.5",
   author: "fengyangsi",
   date: "2026-08-30",
 )

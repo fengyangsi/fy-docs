@@ -7,7 +7,23 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本遵循 [语义化版本 2.0.0](https://semver.org/lang/zh-CN/)。
 
+## [0.1.5] - 2026-08-30
+
+### 新增
+- 支持点击顶部工具栏标题或侧栏项目名称一键返回封面。
+- 支持翻页导航（“上一页”按钮与键盘左右方向键）平滑退回封面（封面作为第 0 节参与有序翻页）。
+
+### 变更
+- 全面升级 PDF 编译规格至最新的 PDF 2.0 标准（`--pdf-standard 2.0` / ISO 32000-2:2020），显著增强标签语义、无障碍访问（Accessibility）及色彩渲染一致性。
+
+### 修复
+- 修复 Typst HTML 导出丢弃 `align`/`rect`/`line`/`grid` 容器导致封面、目录标题与居中内容空白的问题（typst/typst#5512）：引入 `centered` 辅助函数并重构封面为双分支语义结构（`.fy-cover-chip` 与 `.fy-cover-meta` `<dl>/<dt>/<dd>`）。
+- 升级 `base.css` 样式表，适配 `.fy-cover` 类族的明暗主题，并补齐 `.fy-badge-done` 状态徽章样式。
+- 修复封面因未分配锚点 ID 导致点击“上一页”按钮返回封面无响应的问题。
+
 ## [0.1.4] - 2026-08-30
+
+
 
 ### 新增
 - 支持 9 大平台架构预编译二进制程序全自动构建与发布（Linux GNU/musl x86_64/ARM64、macOS Apple Silicon/Intel、Windows x86_64/ARM64、FreeBSD x86_64）。

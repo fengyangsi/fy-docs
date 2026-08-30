@@ -52,6 +52,20 @@
 #let font-sans = fonts.sans
 #let font-mono = fonts.mono
 
+/// Horizontally centered content that survives HTML export.
+///
+/// Typst's HTML backend currently *drops the whole content* wrapped in an
+/// `align(..)` container (it only emits an "align was ignored" warning), so
+/// native alignment must stay on the PDF path while HTML emits an equivalent
+/// CSS rule. See https://github.com/typst/typst/issues/5512.
+#let centered(body) = context {
+  if target() == "html" {
+    html.div(style: "text-align: center", body)
+  } else {
+    align(center, body)
+  }
+}
+
 /// Renders an ISO B5 specification book for an fy project.
 #let project_book(
   title: "fy 规格说明书",
@@ -166,7 +180,7 @@
     content,
   )
 
-  align(center + horizon)[
+  let cover = [
     #v(-20pt)
     #rect(
       fill: palette.chip-bg,
@@ -199,10 +213,42 @@
       text(fill: palette.meta-value)[#methodology],
     )
   ]
+  // `rect`, `line`, and `grid` are dropped *with their contents* by the HTML
+  // backend, so the cover needs a dedicated structural branch instead of
+  // reusing `cover` with a CSS wrapper.
+  context {
+    if target() == "html" {
+      html.div(class: "fy-cover", style: "text-align: center")[
+        #html.span(class: "fy-cover-chip")[
+          #text(size: 9pt, weight: "bold", font: fonts.mono)[
+            PROJECT SPECIFICATION · ISO B5 EDITION
+          ]
+        ]
+        #parbreak()
+        #text(size: 26pt, weight: "bold", fill: palette.title-fill, font: fonts.sans)[#title]
+        #parbreak()
+        #text(size: 13pt, fill: palette.muted, font: fonts.serif)[#subtitle]
+        #parbreak()
+        #html.elem("dl", attrs: (class: "fy-cover-meta"))[
+          #html.elem("dt")[版本 (Version):]
+          #html.elem("dd")[#text(font: fonts.mono)[#version]]
+          #html.elem("dt")[架构师 (Author):]
+          #html.elem("dd")[#author]
+          #html.elem("dt")[构建日期 (Date):]
+          #html.elem("dd")[#text(font: fonts.mono)[#date]]
+          #html.elem("dt")[核心范式 (Methodology):]
+          #html.elem("dd")[#methodology]
+        ]
+      ]
+    } else {
+      // Vertical centering only exists in paged layout.
+      align(center + horizon, cover)
+    }
+  }
   pagebreak()
 
   v(10pt)
-  align(center)[
+  centered[
     #text(size: 16pt, weight: "bold", fill: palette.title-fill, font: fonts.sans)[目 录]
   ]
   v(12pt)

@@ -7,7 +7,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.5] - 2026-08-30
+
+### Added
+- Enabled one-click return to cover by clicking toolbar title or sidebar project brand.
+- Enabled sequential page navigation and arrow key paging back to cover as Chapter 0.
+
+### Changed
+- Upgraded PDF compilation target to modern PDF 2.0 (`--pdf-standard 2.0` / ISO 32000-2:2020) for enhanced tag semantics, accessibility, and color management.
+
+### Fixed
+- Fixed Typst HTML export container dropping issue (typst/typst#5512) by introducing `centered` helper and structural semantic `fy-cover` branches (`.fy-cover-chip`, `.fy-cover-meta` with `<dl>/<dt>/<dd>`).
+- Updated `base.css` with dark/light theme styling for `.fy-cover` classes and completed `.fy-badge-done` styling.
+- Fixed pager "Previous" link ignoring clicks on returning to cover due to missing anchor ID registration.
+
 ## [0.1.4] - 2026-08-30
+
+
 
 ### Added
 - Automated multi-platform binary releases across 9 architectures (Linux GNU/musl x86_64/ARM64, macOS Apple Silicon/Intel, Windows x86_64/ARM64, FreeBSD x86_64).

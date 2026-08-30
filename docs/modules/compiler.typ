@@ -24,4 +24,5 @@ docs/target/
 
 == PDF 输出契约
 
-`pdf` 与 `build --with-pdf` 使用 Typst 生成打印版，写入 `docs/release/<包名>_v<版本>_specification.pdf`。HTML 阅读页不链接或复制 PDF，避免网页构建与 PDF 构建在不同时间产生版本错配。
+`pdf` 与 `build --with-pdf` 使用 Typst 导出现代 PDF 2.0（ISO 32000-2:2020）标准打印版，写入 `docs/release/<包名>_v<版本>_specification.pdf`。HTML 阅读页不链接或复制 PDF，避免网页构建与 PDF 构建在不同时间产生版本错配。
+
