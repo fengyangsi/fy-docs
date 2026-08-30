@@ -17,10 +17,12 @@ pub fn router(state: &Arc<AppState>) -> Router {
         .route(
             "/events",
             get(move || {
-                // Only changes stream (from_changes skips the channel's
-                // current value): live.js records its baseline from the page
-                // itself and reloads on the first differing id.
-                let live = WatchStream::from_changes(events.clone())
+                // WatchStream::new emits the channel's current value once when
+                // a page subscribes (that frame is live.js's baseline) and then
+                // every subsequent bump, so the first save after opening a page
+                // reloads it immediately. from_changes would skip that baseline
+                // and leave the page one rebuild behind.
+                let live = WatchStream::new(events.clone())
                     .map(|id| Ok::<_, Infallible>(SseEvent::default().data(id.to_string())));
                 async move { Sse::new(live).keep_alive(KeepAlive::default()) }
             }),
@@ -38,7 +40,7 @@ mod tests {
     use tower::ServiceExt;
 
     #[tokio::test]
-    async fn events_endpoint_pushes_each_rebuild() {
+    async fn events_endpoint_streams_baseline_then_rebuilds() {
         let temp = std::env::temp_dir().join(format!("fy-docs-server-test-{}", std::process::id()));
         std::fs::create_dir_all(&temp).unwrap();
         let project = Project {
@@ -74,13 +76,20 @@ mod tests {
                 .unwrap(),
             "text/event-stream"
         );
-        // from_changes skips the channel's current value: the first frame
-        // arrives only when a rebuild happens, and no duplicate seed is sent.
-        state.bump_build();
+        // WatchStream::new sends the channel's current value as the first
+        // frame: that baseline is what live.js compares every later rebuild
+        // against, so the very first save triggers a reload.
         let mut body = response.into_body();
-        let frame = body.frame().await.unwrap().unwrap();
-        let data = frame.into_data().unwrap();
-        assert!(std::str::from_utf8(&data).unwrap().contains("data: 2"));
+        let baseline = body.frame().await.unwrap().unwrap().into_data().unwrap();
+        assert!(
+            std::str::from_utf8(&baseline).unwrap().contains("data: 1"),
+            "the first frame must carry the current build id as baseline"
+        );
+
+        // A rebuild pushes the incremented id; live.js reloads on the change.
+        state.bump_build();
+        let frame = body.frame().await.unwrap().unwrap().into_data().unwrap();
+        assert!(std::str::from_utf8(&frame).unwrap().contains("data: 2"));
 
         let _ = std::fs::remove_dir_all(temp);
     }
