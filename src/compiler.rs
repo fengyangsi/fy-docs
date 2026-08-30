@@ -50,50 +50,67 @@ fn generate(project: &Project, with_pdf: bool, lang_filter: Option<&str>) -> Res
         compile_pdf(project, lang_filter)?;
     }
 
+    // Parallel compilation of all language targets for HTML export
+    let results: Vec<Result<(&LanguageTarget, String, String, String)>> = std::thread::scope(|s| {
+        let mut handles = Vec::new();
+        for lang_target in &selected_targets {
+            handles.push(s.spawn(move || {
+                let temp_html = target.join(format!(
+                    "_temp_{}_{}.html",
+                    if lang_target.lang.is_empty() {
+                        "root"
+                    } else {
+                        &lang_target.lang
+                    },
+                    std::process::id()
+                ));
+                run(Command::new("typst")
+                    .args([
+                        "compile",
+                        "--features",
+                        "html",
+                        "--format",
+                        "html",
+                        "--root",
+                    ])
+                    .arg(&project.root)
+                    .arg(&lang_target.entry)
+                    .arg(&temp_html))
+                .context(format!(
+                    "typst HTML export failed for [{}] {}",
+                    if lang_target.lang.is_empty() {
+                        "default"
+                    } else {
+                        &lang_target.lang
+                    },
+                    lang_target.entry.display()
+                ))?;
+
+                let html = fs::read_to_string(&temp_html)?;
+                let title = extract_between(&html, "<title>", "</title>")
+                    .unwrap_or_else(|| project.name.clone());
+                let styles = extract_all_styles(&html);
+                let body = extract_between(&html, "<body>", "</body>")
+                    .context("typst HTML export contains no <body>")?;
+                let _ = fs::remove_file(&temp_html);
+
+                Ok((*lang_target, title, styles, body))
+            }));
+        }
+        handles.into_iter().map(|h| h.join().unwrap()).collect()
+    });
+
     let mut combined_styles = String::new();
     let mut rendered_pages: Vec<(&LanguageTarget, String, String)> = Vec::new();
 
-    for lang_target in &selected_targets {
-        let temp_html = target.join(format!(
-            "_temp_{}.html",
-            if lang_target.lang.is_empty() {
-                "root"
-            } else {
-                &lang_target.lang
-            }
-        ));
-        run(Command::new("typst")
-            .args([
-                "compile",
-                "--features",
-                "html",
-                "--format",
-                "html",
-                "--root",
-            ])
-            .arg(&project.root)
-            .arg(&lang_target.entry)
-            .arg(&temp_html))
-        .context(format!(
-            "typst HTML export failed for {}",
-            lang_target.entry.display()
-        ))?;
-
-        let html = fs::read_to_string(&temp_html)?;
-        let title =
-            extract_between(&html, "<title>", "</title>").unwrap_or_else(|| project.name.clone());
-        let styles = extract_all_styles(&html);
+    for res in results {
+        let (lang_target, title, styles, body) = res?;
         if combined_styles.is_empty() {
             combined_styles = styles;
         } else if !styles.is_empty() && !combined_styles.contains(&styles) {
             combined_styles.push_str("\n/* additional language styles */\n");
             combined_styles.push_str(&styles);
         }
-
-        let body = extract_between(&html, "<body>", "</body>")
-            .context("typst HTML export contains no <body>")?;
-        let _ = fs::remove_file(&temp_html);
-
         rendered_pages.push((lang_target, title, body));
     }
 
@@ -144,7 +161,7 @@ fn generate(project: &Project, with_pdf: bool, lang_filter: Option<&str>) -> Res
     Ok(())
 }
 
-/// Compiles the print-edition PDF 2.0 specifications into `docs/release/`.
+/// Compiles the print-edition PDF 2.0 specifications into `docs/release/` in parallel.
 pub fn compile_pdf(project: &Project, lang_filter: Option<&str>) -> Result<Vec<PathBuf>> {
     fs::create_dir_all(&project.release_dir)?;
     let selected_targets = project.selected_targets(lang_filter);
@@ -155,21 +172,35 @@ pub fn compile_pdf(project: &Project, lang_filter: Option<&str>) -> Result<Vec<P
         );
     }
 
-    let mut generated_paths = Vec::new();
-    for lang_target in selected_targets {
-        let release_path = project.release_dir.join(&lang_target.pdf_file_name);
-        run(Command::new("typst")
-            .args(["compile", "--root"])
-            .arg(&project.root)
-            .args(["--pdf-standard", "2.0"])
-            .arg(&lang_target.entry)
-            .arg(&release_path))
-        .context(format!(
-            "typst PDF export failed for {}",
-            lang_target.entry.display()
-        ))?;
+    let results: Vec<Result<PathBuf>> = std::thread::scope(|s| {
+        let mut handles = Vec::new();
+        for lang_target in selected_targets {
+            handles.push(s.spawn(move || {
+                let release_path = project.release_dir.join(&lang_target.pdf_file_name);
+                run(Command::new("typst")
+                    .args(["compile", "--root"])
+                    .arg(&project.root)
+                    .args(["--pdf-standard", "2.0"])
+                    .arg(&lang_target.entry)
+                    .arg(&release_path))
+                .context(format!(
+                    "typst PDF export failed for [{}] {}",
+                    if lang_target.lang.is_empty() {
+                        "default"
+                    } else {
+                        &lang_target.lang
+                    },
+                    lang_target.entry.display()
+                ))?;
+                Ok(release_path)
+            }));
+        }
+        handles.into_iter().map(|h| h.join().unwrap()).collect()
+    });
 
-        generated_paths.push(release_path);
+    let mut generated_paths = Vec::new();
+    for res in results {
+        generated_paths.push(res?);
     }
 
     ensure_gitignore_ignores(project, ["/docs/release/"]);
@@ -216,7 +247,11 @@ fn extract_all_styles(html: &str) -> String {
 /// Makes sure the generated directories stay ignored; creates the .gitignore
 /// entry when missing so `git status` stays clean without manual setup.
 fn ensure_gitignore_ignores(project: &Project, entries: impl IntoIterator<Item = &'static str>) {
-    let gitignore = project.docs_dir.join("..").join(".gitignore");
+    let gitignore = project
+        .docs_dir
+        .parent()
+        .unwrap_or(&project.docs_dir)
+        .join(".gitignore");
     let mut content = fs::read_to_string(&gitignore).unwrap_or_default();
     let mut changed = false;
     for entry in entries {

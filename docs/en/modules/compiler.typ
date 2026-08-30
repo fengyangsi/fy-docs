@@ -9,5 +9,9 @@ The `compiler` module invokes the `typst` CLI to produce modern HTML output and 
 ]
 
 #contract[
-  HTML compilation generates all language targets under `docs/target/` (`index_zh-CN.html`, `index_en.html`) with shared static assets (`fy-docs.css`, `fy-docs.js`).
+  HTML compilation leverages `std::thread::scope` to execute parallel multi-language builds. All language targets reside side-by-side in `docs/target/` (`index_zh-CN.html`, `index_en.html`) with shared assets, and a lightweight client-side routing landing page (`index.html`).
+]
+
+#invariant[
+  The root `index.html` landing page generated in multi-language mode must remain under 1KB, never copying body text, and dynamically route visitors based on language priority with English fallback.
 ]

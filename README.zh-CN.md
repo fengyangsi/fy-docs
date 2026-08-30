@@ -71,17 +71,36 @@ cargo fy-docs dev --port 8181 # 自定义开发服务器端口
 
 ## 文档目录结构
 
+单语言项目目录结构：
+
 ```text
 项目根目录/
 ├── Cargo.toml
 ├── src/
-├── target/                  # 程序构建产物
 └── docs/
-    ├── main.typ             # Typst 文档入口
-    ├── fy-spec/             # 内嵌的规格模板库（lib.typ，完全自包含）
+    ├── main.typ             # 单语言 Typst 入口
+    ├── fy-spec/             # 内嵌规格模板库（lib.typ，完全自包含）
     ├── modules/             # 按模块组织的规格源码
-    ├── target/              # 生成物：HTML、CSS、JavaScript（Git 忽略）
-    └── release/             # 生成物：版本化的规格书 PDF（Git 忽略）
+    ├── target/              # 生成的离线 HTML 阅读页（Git 忽略）
+    └── release/             # 生成的版本化规格书 PDF（Git 忽略）
+```
+
+多语言（i18n）项目目录结构：
+
+```text
+项目根目录/
+├── Cargo.toml
+├── src/
+└── docs/
+    ├── fy-spec/             # 共享的内嵌规格模板库（lib.typ）
+    ├── zh-CN/               # 简体中文规格书
+    │   ├── main.typ
+    │   └── modules/
+    ├── en/                  # 英文规格书
+    │   ├── main.typ
+    │   └── modules/
+    ├── target/              # 生成 index.html（智能分流）、index_zh-CN.html、index_en.html
+    └── release/             # 各语言版本化的规格书 PDF
 ```
 
 `docs/fy-spec/` 存放内嵌的完整排版规范模板（ISO B5 版式、语义契约框、状态徽章等），确保每个项目的规格文档完全自包含，在任何环境下均可独立编译与渲染，不依赖外部或系统级路径。

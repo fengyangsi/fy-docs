@@ -9,5 +9,9 @@
 ]
 
 #contract[
-  HTML 编译支持多语言并发/按序渲染。所有语言页面在 `docs/target/` 下同级生成（`index_zh-CN.html`、`index_en.html`），并统一共享 `fy-docs.css` 与 `fy-docs.js`，绝不重复生成多份样式表副本。
+  HTML 编译支持多语言并发渲染（基于 `std::thread::scope` 并发调度 Typst CLI）。所有语言页面在 `docs/target/` 下同级生成（`index_zh-CN.html`、`index_en.html`），统一共享静态资产，并在根路径生成轻量客户端路由分流页 `index.html`。
+]
+
+#invariant[
+  `compiler` 模块在多语言模式下生成的根 `index.html` 体积必须保持在 1KB 以内，绝不复制大文件正文，通过动态 JSON 字典精准匹配访问者语言偏好并以英文兜底。
 ]

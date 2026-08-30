@@ -16,6 +16,9 @@
     chapterNavigation: '章节导航',
     previous: '上一页',
     next: '下一页',
+    copy: '复制',
+    copied: '已复制 ✓',
+    copyCode: '复制代码',
     position: function (current, total) { return '第 ' + current + ' / ' + total + ' 节'; }
   } : {
     cover: 'Cover',
@@ -23,10 +26,20 @@
     chapterNavigation: 'Chapter navigation',
     previous: 'Previous',
     next: 'Next',
+    copy: 'Copy',
+    copied: 'Copied ✓',
+    copyCode: 'Copy code',
     position: function (current, total) { return 'Chapter ' + current + ' of ' + total; }
   };
 
   function $(id) { return document.getElementById(id); }
+  function escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
   function readSetting(key) {
     try { return window.localStorage ? window.localStorage.getItem(key) : null; }
     catch (_) { return null; }
@@ -61,27 +74,30 @@
     });
   }
 
-  function setMenu(open) {
-    themeMenu.hidden = !open;
-    themeToggle.setAttribute('aria-expanded', String(open));
-  }
-
-  themeToggle.addEventListener('click', function (event) {
-    event.stopPropagation();
-    setMenu(themeMenu.hidden);
-  });
-  document.addEventListener('click', function (event) {
-    if (!themeMenu.hidden && !themeMenu.contains(event.target)) setMenu(false);
-  });
-  Array.prototype.forEach.call(themeMenu.querySelectorAll('[data-theme]'), function (item) {
-    item.addEventListener('click', function () {
-      writeSetting(THEME_KEY, item.getAttribute('data-theme'));
-      paintTheme();
-      setMenu(false);
+  if (themeToggle && themeMenu) {
+    paintTheme();
+    function setThemeMenu(open) {
+      themeMenu.hidden = !open;
+      themeToggle.setAttribute('aria-expanded', String(open));
+    }
+    themeToggle.addEventListener('click', function (event) {
+      event.stopPropagation();
+      setThemeMenu(themeMenu.hidden);
     });
-  });
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', paintTheme);
-  paintTheme();
+    themeMenu.addEventListener('click', function (event) {
+      var target = event.target.closest ? event.target.closest('[data-theme]') : null;
+      if (!target) return;
+      writeSetting(THEME_KEY, target.getAttribute('data-theme'));
+      paintTheme();
+      setThemeMenu(false);
+    });
+    document.addEventListener('click', function (event) {
+      if (!themeMenu.hidden && !themeMenu.contains(event.target)) setThemeMenu(false);
+    });
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () {
+      if (storedTheme() === 'preference') paintTheme();
+    });
+  }
 
   /* ---------- language menu ---------- */
   var langToggle = $('fy-lang-toggle');
@@ -97,10 +113,15 @@
       setLangMenu(langMenu.hidden);
     });
     Array.prototype.forEach.call(langMenu.querySelectorAll('a.fy-lang-item'), function (item) {
-      item.addEventListener('click', function () {
+      item.addEventListener('click', function (event) {
         var href = item.getAttribute('href');
         if (href) {
           try { localStorage.setItem('fydocs-lang', href); } catch (_) {}
+          if (window.location.hash) {
+            event.preventDefault();
+            var targetUrl = href.split('#')[0] + window.location.hash;
+            window.location.href = targetUrl;
+          }
         }
       });
     });
@@ -225,9 +246,18 @@
     searchResults.textContent = '';
     query = query.trim().toLocaleLowerCase();
     if (!query) return;
-    var matches = chapters.filter(function (chapter) {
-      return chapter.el.textContent.toLocaleLowerCase().indexOf(query) !== -1;
+    var matches = [];
+    chapters.forEach(function (chapter, index) {
+      var text = chapter.el.textContent.toLocaleLowerCase();
+      var pos = text.indexOf(query);
+      if (pos !== -1) {
+        var start = Math.max(0, pos - 15);
+        var end = Math.min(text.length, pos + query.length + 35);
+        var rawSnippet = chapter.el.textContent.slice(start, end).replace(/\s+/g, ' ');
+        matches.push({ chapter: chapter, index: index, snippet: rawSnippet });
+      }
     });
+
     if (!matches.length) {
       var empty = document.createElement('p');
       empty.className = 'fy-search-empty';
@@ -235,15 +265,19 @@
       searchResults.appendChild(empty);
       return;
     }
-    matches.forEach(function (chapter) {
-      var index = chapters.indexOf(chapter);
+
+    var safeQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    var regex = new RegExp('(' + safeQuery + ')', 'gi');
+
+    matches.forEach(function (m) {
       var result = document.createElement('button');
+      var highlighted = escapeHtml(m.snippet).replace(regex, '<mark>$1</mark>');
       result.className = 'fy-search-result';
       result.type = 'button';
-      result.textContent = chapter.title;
+      result.innerHTML = '<span class="fy-search-result-title">' + escapeHtml(m.chapter.title) + '</span><span class="fy-search-result-snippet">...' + highlighted + '...</span>';
       result.addEventListener('click', function () {
         setSearch(false);
-        go(index, chapter.firstId);
+        go(m.index, m.chapter.firstId);
       });
       searchResults.appendChild(result);
     });
@@ -376,11 +410,42 @@
     });
   }
 
+  /* ---------- copy code buttons ---------- */
+  Array.prototype.forEach.call(document.querySelectorAll('.fy-doc pre'), function (pre) {
+    var wrapper = document.createElement('div');
+    wrapper.className = 'fy-code-block';
+    pre.parentNode.insertBefore(wrapper, pre);
+    wrapper.appendChild(pre);
+
+    var copyBtn = document.createElement('button');
+    copyBtn.className = 'fy-copy-btn';
+    copyBtn.type = 'button';
+    copyBtn.setAttribute('aria-label', TEXT.copyCode || 'Copy');
+    copyBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg><span>' + (TEXT.copy || 'Copy') + '</span>';
+
+    copyBtn.addEventListener('click', function () {
+      var code = pre.querySelector('code') || pre;
+      var text = code.innerText || code.textContent || '';
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () {
+          copyBtn.classList.add('fy-copied');
+          copyBtn.querySelector('span').textContent = TEXT.copied || 'Copied ✓';
+          window.setTimeout(function () {
+            copyBtn.classList.remove('fy-copied');
+            copyBtn.querySelector('span').textContent = TEXT.copy || 'Copy';
+          }, 1500);
+        });
+      }
+    });
+
+    wrapper.appendChild(copyBtn);
+  });
+
   if (chapters.length > 1) {
     makePager();
     var startId = decodeURIComponent(window.location.hash.slice(1));
     var start = Object.prototype.hasOwnProperty.call(idToChapter, startId) ? idToChapter[startId] : 0;
-    go(start, start || null);
+    go(start, startId || null);
   }
 })();
 

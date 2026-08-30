@@ -71,17 +71,36 @@ The package name and version are read from `[package]` in `Cargo.toml`, includin
 
 ## Document Layout
 
+Single-language documentation layout:
+
 ```text
 project/
 ├── Cargo.toml
 ├── src/
-├── target/                  # Program build artifacts
 └── docs/
-    ├── main.typ             # Typst entry point
-    ├── fy-spec/             # Embedded specification template library (lib.typ, self-contained)
-    ├── modules/             # Specification source, organized by module
-    ├── target/              # Generated HTML, CSS, and JavaScript (Git ignored)
+    ├── main.typ             # Single Typst entry point
+    ├── fy-spec/             # Embedded template library (lib.typ, self-contained)
+    ├── modules/             # Specification source by module
+    ├── target/              # Generated HTML reading pages (Git ignored)
     └── release/             # Versioned specification PDFs (Git ignored)
+```
+
+Multilingual (i18n) documentation layout:
+
+```text
+project/
+├── Cargo.toml
+├── src/
+└── docs/
+    ├── fy-spec/             # Shared embedded template library (lib.typ)
+    ├── zh-CN/               # Simplified Chinese specification
+    │   ├── main.typ
+    │   └── modules/
+    ├── en/                  # English specification
+    │   ├── main.typ
+    │   └── modules/
+    ├── target/              # Generated index.html, index_zh-CN.html, index_en.html
+    └── release/             # Versioned PDFs for each language
 ```
 
 `docs/fy-spec/` contains the embedded styling templates (ISO B5 layout, semantic contract boxes, badges), ensuring specification documents are fully self-contained and reproducible without external dependencies.

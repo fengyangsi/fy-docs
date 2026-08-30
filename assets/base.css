@@ -336,7 +336,7 @@ body {
 .fy-search-result {
   display: block;
   width: 100%;
-  padding: 7px 8px;
+  padding: 8px 10px;
   border: 0;
   border-radius: 6px;
   background: transparent;
@@ -347,6 +347,27 @@ body {
   cursor: pointer;
 }
 .fy-search-result:hover { background: color-mix(in srgb, var(--ink) 8%, var(--bg)); }
+.fy-search-result-title {
+  display: block;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 2px;
+}
+.fy-search-result-snippet {
+  display: block;
+  font-size: 0.76rem;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fy-search-result-snippet mark {
+  background: color-mix(in srgb, var(--links) 25%, transparent);
+  color: var(--links);
+  font-weight: 700;
+  border-radius: 2px;
+  padding: 0 2px;
+}
 .fy-search-empty { margin: 8px 0 0; color: var(--muted); font-size: 0.84rem; }
 .fy-github-link {
   display: inline-flex;
@@ -506,6 +527,46 @@ body {
   border-radius: 6px;
   padding: 12px 16px;
   overflow-x: auto;
+}
+
+.fy-code-block {
+  position: relative;
+  margin: 1em 0;
+}
+.fy-code-block pre {
+  margin: 0;
+}
+.fy-copy-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 7px;
+  font-size: 0.72rem;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--code-bg) 85%, var(--bg));
+  border: 1px solid var(--code-border);
+  border-radius: 5px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, color 0.15s ease, background 0.15s ease;
+  user-select: none;
+}
+.fy-code-block:hover .fy-copy-btn,
+.fy-copy-btn:focus-visible {
+  opacity: 1;
+}
+.fy-copy-btn:hover {
+  color: var(--links);
+  background: color-mix(in srgb, var(--ink) 8%, var(--code-bg));
+}
+.fy-copy-btn.fy-copied {
+  opacity: 1;
+  color: var(--accent-tip);
+  border-color: var(--accent-tip);
 }
 
 .fy-doc pre code {
