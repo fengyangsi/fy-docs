@@ -96,8 +96,13 @@
       event.stopPropagation();
       setLangMenu(langMenu.hidden);
     });
-    document.addEventListener('click', function (event) {
-      if (!langMenu.hidden && !langMenu.contains(event.target)) setLangMenu(false);
+    Array.prototype.forEach.call(langMenu.querySelectorAll('a.fy-lang-item'), function (item) {
+      item.addEventListener('click', function () {
+        var href = item.getAttribute('href');
+        if (href) {
+          try { localStorage.setItem('fydocs-lang', href); } catch (_) {}
+        }
+      });
     });
   }
 

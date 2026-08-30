@@ -163,6 +163,62 @@ fn escape_attribute(text: &str) -> String {
     escape(text).replace('"', "&quot;")
 }
 
+/// Renders a tiny (~500B) client-side language routing landing page.
+pub fn redirect_page(all_targets: &[LanguageTarget]) -> String {
+    let distinct: Vec<&LanguageTarget> = all_targets
+        .iter()
+        .filter(|t| !t.lang.is_empty())
+        .collect();
+
+    let default_target = distinct
+        .iter()
+        .find(|t| t.lang.eq_ignore_ascii_case("zh-cn") || t.lang.eq_ignore_ascii_case("zh"))
+        .or_else(|| distinct.first())
+        .map(|t| t.html_file_name.as_str())
+        .unwrap_or("index_zh-CN.html");
+
+    let mut links = String::new();
+    for (i, t) in distinct.iter().enumerate() {
+        if i > 0 {
+            links.push_str(" | ");
+        }
+        links.push_str(&format!(
+            r#"<a href="{}">{}</a>"#,
+            escape_attribute(&t.html_file_name),
+            escape(&t.display_name)
+        ));
+    }
+
+    format!(
+        r#"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Redirecting...</title>
+<script>
+(function () {{
+  var stored = null;
+  try {{ stored = localStorage.getItem('fydocs-lang'); }} catch (_) {{}}
+  if (stored) {{ location.replace(stored); return; }}
+  var lang = (navigator.language || '').toLowerCase();
+  if (lang.indexOf('zh') === 0) {{
+    location.replace('{default_target}');
+  }} else {{
+    location.replace('index_en.html');
+  }}
+}})();
+</script>
+<noscript><meta http-equiv="refresh" content="0; url={default_target}"></noscript>
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; text-align: center; padding: 40px;">
+  <p>Redirecting / 正在跳转：{links}</p>
+</body>
+</html>
+"#
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

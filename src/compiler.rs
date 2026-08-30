@@ -119,25 +119,25 @@ fn generate(project: &Project, with_pdf: bool, lang_filter: Option<&str>) -> Res
         }
     }
 
-    // If no index.html was directly generated (e.g. only docs/zh-CN/main.typ exists),
-    // copy the preferred rendered language page as the default index.html.
+    // If no index.html was directly generated from a root main.typ:
     if !has_index && !rendered_pages.is_empty() {
-        let preferred_index = rendered_pages
-            .iter()
-            .position(|(t, _, _)| {
-                t.lang.eq_ignore_ascii_case("zh-cn") || t.lang.eq_ignore_ascii_case("zh")
-            })
-            .unwrap_or(0);
-        let (first_target, title, body) = &rendered_pages[preferred_index];
-        let default_page = crate::assets::doc_page(
-            title,
-            &project.name,
-            project.repository.as_deref(),
-            body.trim(),
-            Some(first_target),
-            &project.targets,
-        );
-        fs::write(target.join(INDEX_FILE), default_page)?;
+        if rendered_pages.len() == 1 {
+            // Single-language subfolder: copy page directly to index.html
+            let (first_target, title, body) = &rendered_pages[0];
+            let default_page = crate::assets::doc_page(
+                title,
+                &project.name,
+                project.repository.as_deref(),
+                body.trim(),
+                Some(first_target),
+                &project.targets,
+            );
+            fs::write(target.join(INDEX_FILE), default_page)?;
+        } else {
+            // Multi-language: write lightweight (~500B) client-side redirect landing page
+            let landing = crate::assets::redirect_page(&project.targets);
+            fs::write(target.join(INDEX_FILE), landing)?;
+        }
     }
 
     ensure_gitignore_ignores(project, ["/docs/target/"]);
