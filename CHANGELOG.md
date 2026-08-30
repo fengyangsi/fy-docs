@@ -7,6 +7,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.10] - 2026-08-31
+
+### Added
+- **`--open` for `pdf`**: `cargo fy-docs pdf --open` opens the first generated release PDF, matching the option the README already documented for the other commands.
+
+### Changed
+- **`--lang` is normalized and strict**: `ZH_CN`, `zh-cn` and `zh_CN` now select the same target, while a filter that matches no language fails with a non-zero exit code and lists the languages the project actually provides instead of quietly building the default target only. Matching stays exact: `--lang zh` does not select `zh-CN`.
+- **Typst warnings are surfaced**: a successful compile forwards typst's stderr instead of discarding it, so font substitution and directives dropped by HTML export no longer hide behind a green build. The repeated `unknown font family` reports fold into one deduplicated line, and Windows verbatim path prefixes are stripped from forwarded diagnostics.
+- **Language detection is rule-based**: any `docs/` subdirectory carrying its own `main.typ` is a language target except the generated directories, so shared source folders no longer need an entry on a name denylist.
+- **Debounced rebuilds are bounded**: a save burst still folds into one rebuild, but the wait is capped at 2s from the first change, so a process writing sources continuously cannot postpone the rebuild forever.
+
+### Fixed
+- The absolute-import scan honours both quote styles and `//` comments, so a commented-out `#import` can no longer steer root detection to the wrong ancestor; it also skips `docs/release/` alongside `docs/target/`.
+- The `main.typ` version fallback reads uncommented code only and skips a `version:` without a quoted value instead of abandoning the search.
+- Every build sweeps `docs/target/` of artifacts fy-docs no longer writes (`_poll.js`, `_build`) and of `_temp_*.html` intermediates left by a killed compile.
+- `extract_all_styles` also captures `<style>` tags carrying attributes, which makes multi-language style merging a live path instead of dead code.
+- A failing `--with-pdf` stage still leaves the routing landing page in place for pure i18n projects, so the dev server keeps a route for `/`.
+
+### Removed
+- Deleted the never-read `Project::entry` field and the superseded `Project::pdf_file_name()`, and gated the test-only `AppState::new` behind `#[cfg(test)]`. Internal items are now `pub(crate)`, since the crate deliberately exposes no library API.
+
 ## [0.1.9] - 2026-08-31
 
 ### Fixed

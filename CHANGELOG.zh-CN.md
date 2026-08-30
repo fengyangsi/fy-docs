@@ -7,6 +7,27 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本遵循 [语义化版本 2.0.0](https://semver.org/lang/zh-CN/)。
 
+## [0.1.10] - 2026-08-31
+
+### 新增
+- **`pdf` 支持 `--open`**：`cargo fy-docs pdf --open` 打开首个生成的发行版 PDF，补齐 README 早已为其他子命令声明的选项。
+
+### 变更
+- **`--lang` 归一化且严格**：`ZH_CN`、`zh-cn`、`zh_CN` 现在指向同一目标；而过滤值匹配不到任何语言时以非零码失败并列出项目实际提供的语言，不再静默退化为"只构建 default 目标"。匹配保持精确：`--lang zh` 不会命中 `zh-CN`。
+- **透传 typst 告警**：编译成功时转发 typst 的 stderr，字体替换与 HTML 导出丢弃的排版指令不再藏身于绿色构建之后。重复上报的 `unknown font family` 折叠为按字体族去重的一行，转发的诊断文本一并剥掉 Windows verbatim 路径前缀。
+- **语言目录判定改为正向规则**：`docs/` 下自带 `main.typ` 的子目录即为语言目标，仅生成目录除外；共享源目录不必再维护硬编码名单。
+- **去抖重建设有上限**：连续保存仍合并为一次构建，但等待自首次变更起最长 2 秒，持续写入源文件的进程无法再无限推迟重建。
+
+### 修复
+- 绝对导入扫描尊重单双引号与 `//` 注释，被注释掉的 `#import` 不再把 root 拖到错误的祖先目录；该扫描同时跳过 `docs/release/`。
+- `main.typ` 版本回退只读未注释代码，且遇到无引号值的 `version:` 时继续查找而非直接放弃。
+- 每次构建清扫 `docs/target/`：移除 fy-docs 已不再写出的历史产物（`_poll.js`、`_build`）与被强制中断的编译残留的 `_temp_*.html`。
+- `extract_all_styles` 现可提取带属性的 `<style>` 标签，使多语言样式合并从死代码变为生效路径。
+- `--with-pdf` 阶段失败时仍为纯多语言项目保留语言路由分流页，开发服务器根路径不再无路由可用。
+
+### 移除
+- 删除零读取的 `Project::entry` 字段与已被取代的 `Project::pdf_file_name()`，并将仅供测试使用的 `AppState::new` 收进 `#[cfg(test)]`。内部项可见性统一收窄为 `pub(crate)`——本 crate 有意不公开任何库 API。
+
 ## [0.1.9] - 2026-08-31
 
 ### 修复
