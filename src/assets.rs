@@ -163,6 +163,40 @@ fn escape_attribute(text: &str) -> String {
     escape(text).replace('"', "&quot;")
 }
 
+/// Escapes a value for a string literal inside an HTML `<script>` block.
+/// HTML metacharacters are escaped first so a value can never break out of
+/// the script element; backslashes, the quote character, and line/control
+/// characters are then escaped so the literal stays valid JavaScript.
+fn escape_script_string(text: &str, quote: char) -> String {
+    let mut out = String::with_capacity(text.len());
+    for c in escape(text).chars() {
+        match c {
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            '\u{2028}' | '\u{2029}' => out.push_str(&format!("\\u{:04x}", c as u32)),
+            c if (c as u32) < 0x20 => out.push_str(&format!("\\u{:04x}", c as u32)),
+            c if c == quote => {
+                out.push('\\');
+                out.push(c);
+            }
+            c => out.push(c),
+        }
+    }
+    out
+}
+
+/// Escapes a value for a double-quoted JSON string in a script block.
+fn escape_json_string(text: &str) -> String {
+    escape_script_string(text, '"')
+}
+
+/// Escapes a value for a single-quoted JavaScript string literal.
+fn escape_js_string(text: &str) -> String {
+    escape_script_string(text, '\'')
+}
+
 /// Renders a tiny (~500B) client-side language routing landing page with dynamic matching.
 pub fn redirect_page(all_targets: &[LanguageTarget]) -> String {
     let distinct: Vec<&LanguageTarget> =
@@ -174,15 +208,15 @@ pub fn redirect_page(all_targets: &[LanguageTarget]) -> String {
         let file = &t.html_file_name;
         map_entries.push(format!(
             r#""{}":"{}""#,
-            escape_attribute(&lang_lower),
-            escape_attribute(file)
+            escape_json_string(&lang_lower),
+            escape_json_string(file)
         ));
         if let Some((base, _)) = lang_lower.split_once('-') {
             if !base.is_empty() {
                 map_entries.push(format!(
                     r#""{}":"{}""#,
-                    escape_attribute(base),
-                    escape_attribute(file)
+                    escape_json_string(base),
+                    escape_json_string(file)
                 ));
             }
         }
@@ -233,16 +267,18 @@ pub fn redirect_page(all_targets: &[LanguageTarget]) -> String {
     var base = l.split('-')[0];
     if (map[base]) {{ location.replace(map[base]); return; }}
   }}
-  location.replace('{default_target}');
+  location.replace('{}');
 }})();
 </script>
-<noscript><meta http-equiv="refresh" content="0; url={default_target}"></noscript>
+<noscript><meta http-equiv="refresh" content="0; url={}"></noscript>
 </head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; text-align: center; padding: 40px;">
   <p>Redirecting / 正在跳转：{links}</p>
 </body>
 </html>
-"#
+"#,
+        escape_js_string(default_target),
+        escape_attribute(default_target)
     )
 }
 
@@ -283,6 +319,17 @@ mod tests {
     fn localizes_controls_for_chinese_documents() {
         let page = doc_page("中文文档", "fy-x", None, "<h1>内容</h1>", None, &[]);
         assert!(page.contains("<html lang=\"zh-CN\">"));
+    }
+
+    #[test]
+    fn script_strings_escape_breakout_sequences() {
+        assert_eq!(escape_json_string(r#"a"b\c"#), r#"a\"b\\c"#);
+        assert_eq!(escape_json_string("a\nb\u{2028}c"), "a\\nb\\u2028c");
+        assert_eq!(escape_json_string("a</script>b"), "a&lt;/script&gt;b");
+        assert_eq!(escape_json_string("plain"), "plain");
+        assert_eq!(escape_js_string("it's"), "it\\'s");
+        assert_eq!(escape_js_string(r"a\b"), "a\\\\b");
+        assert_eq!(escape_js_string("a</script>b"), "a&lt;/script&gt;b");
     }
 
     #[test]
