@@ -12,8 +12,7 @@ pub const INDEX_FILE: &str = "index.html";
 pub const SKIN_FILE: &str = "fy-docs.css";
 pub const TYPST_CSS_FILE: &str = "typst.css";
 pub const VIEWER_JS_FILE: &str = "fy-docs.js";
-pub const POLL_STUB_FILE: &str = "_poll.js";
-pub const BUILD_FILE: &str = "_build";
+pub const LIVE_JS_FILE: &str = "live.js";
 
 /// The oldest typst release that accepts every flag fy-docs passes:
 /// `--pdf-standard 2.0` first shipped in Typst 0.14.
@@ -145,7 +144,7 @@ fn generate(project: &Project, with_pdf: bool, lang_filter: Option<&str>) -> Res
     fs::write(target.join(TYPST_CSS_FILE), combined_styles)?;
     fs::write(target.join(SKIN_FILE), crate::assets::BASE_CSS)?;
     fs::write(target.join(VIEWER_JS_FILE), crate::assets::VIEWER_JS)?;
-    fs::write(target.join(POLL_STUB_FILE), crate::assets::POLL_STUB)?;
+    fs::write(target.join(LIVE_JS_FILE), crate::assets::LIVE_JS)?;
 
     for (lang_target, title, body) in &rendered_pages {
         let page_html = crate::assets::doc_page(
@@ -438,7 +437,7 @@ fn write_error_page(
     fs::write(target.join(SKIN_FILE), crate::assets::BASE_CSS)?;
     fs::write(target.join(VIEWER_JS_FILE), crate::assets::VIEWER_JS)?;
     fs::write(target.join(TYPST_CSS_FILE), "")?;
-    fs::write(target.join(POLL_STUB_FILE), crate::assets::POLL_STUB)?;
+    fs::write(target.join(LIVE_JS_FILE), crate::assets::LIVE_JS)?;
     Ok(())
 }
 

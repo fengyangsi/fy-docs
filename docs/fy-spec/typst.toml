@@ -1,0 +1,8 @@
+[package]
+name = "fy-spec"
+version = "0.1.0"
+entrypoint = "lib.typ"
+authors = ["fengyangsi"]
+description = "Shared Typst specification document system for the fy ecosystem"
+categories = ["report"]
+disciplines = ["computer-science"]

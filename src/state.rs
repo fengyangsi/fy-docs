@@ -1,8 +1,9 @@
-//! Shared state: the project plus a monotonically increasing build id.
+//! Shared state: the project, generation options, and the build-id channel.
 
 use crate::project::Project;
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
+use tokio::sync::watch;
 
 /// Options captured at startup; dev-mode rebuilds reuse them so a filtered
 /// session (for example `dev --lang zh-CN`) stays filtered after the first
@@ -20,6 +21,12 @@ pub struct AppState {
     pub build_id: AtomicU64,
     /// Startup options reused by the watcher on every rebuild.
     pub generate: GenerateOptions,
+    /// Broadcasts the current build id to `/events` subscribers so open
+    /// pages reload themselves after each rebuild.
+    events: watch::Sender<u64>,
+    /// Holds a receiver for the process lifetime: a watch channel with no
+    /// receiver is closed, and `send` would silently drop every update.
+    _events_anchor: watch::Receiver<u64>,
 }
 
 impl AppState {
@@ -31,34 +38,30 @@ impl AppState {
 
     /// Captures the CLI options so later rebuilds repeat the same generation.
     pub fn with_generate(project: Project, generate: GenerateOptions) -> Self {
+        let (events, _events_anchor) = watch::channel(1);
         Self {
             project,
             build_id: AtomicU64::new(1),
             generate,
+            events,
+            _events_anchor,
         }
+    }
+
+    /// Subscribes to the build-id broadcast (fed into the `/events` stream).
+    pub fn subscribe(&self) -> watch::Receiver<u64> {
+        self.events.subscribe()
     }
 
     pub fn current_build_id(&self) -> u64 {
         self.build_id.load(Ordering::SeqCst)
     }
 
-    /// Bumps the build id and persists it into `docs/target/_build`; served
-    /// pages poll this file and reload themselves when it changes.
+    /// Bumps the build id and notifies every `/events` subscriber so open
+    /// pages reload themselves.
     pub fn bump_build(&self) {
         let id = self.build_id.fetch_add(1, Ordering::SeqCst) + 1;
-        let path = self.project.target_dir.join(crate::compiler::BUILD_FILE);
-        if let Err(err) = std::fs::write(&path, id.to_string()) {
-            crate::state::log(&format!(
-                "[fy-docs] could not update {}: {err}",
-                path.display()
-            ));
-        }
-    }
-
-    /// Writes the initial build id after the first successful generation.
-    pub fn write_build(&self) {
-        let path = self.project.target_dir.join(crate::compiler::BUILD_FILE);
-        let _ = std::fs::write(&path, self.current_build_id().to_string());
+        let _ = self.events.send(id);
     }
 }
 
@@ -103,7 +106,7 @@ mod tests {
     }
 
     #[test]
-    fn app_state_tracks_and_bumps_build_id() {
+    fn app_state_tracks_and_broadcasts_build_id() {
         let temp = std::env::temp_dir().join(format!("fy-docs-state-test-{}", std::process::id()));
         std::fs::create_dir_all(&temp).unwrap();
         let project = Project {
@@ -119,15 +122,13 @@ mod tests {
             watch_dirs: Vec::new(),
         };
         let state = AppState::new(project);
+        let events = state.subscribe();
         assert_eq!(state.current_build_id(), 1);
-
-        state.write_build();
-        let build_file = temp.join(crate::compiler::BUILD_FILE);
-        assert_eq!(std::fs::read_to_string(&build_file).unwrap(), "1");
+        assert_eq!(*events.borrow(), 1);
 
         state.bump_build();
         assert_eq!(state.current_build_id(), 2);
-        assert_eq!(std::fs::read_to_string(&build_file).unwrap(), "2");
+        assert_eq!(*events.borrow(), 2);
 
         let _ = std::fs::remove_dir_all(temp);
     }

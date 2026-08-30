@@ -46,3 +46,4 @@
 #include "modules/compiler.typ"
 #include "modules/server.typ"
 #include "modules/viewer.typ"
+#include "modules/fy-spec.typ"

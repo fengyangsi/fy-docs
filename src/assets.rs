@@ -5,10 +5,9 @@ use crate::project::LanguageTarget;
 const DOC_TEMPLATE: &str = include_str!("../assets/doc.html");
 pub const BASE_CSS: &str = include_str!("../assets/base.css");
 pub const VIEWER_JS: &str = include_str!("../assets/viewer.js");
-/// Shipped with `build` output: a no-op so `file://` pages stay silent.
-pub const POLL_STUB: &str = "/* fy-docs: live reload is only provided by `cargo fy-docs dev`. */\n";
-/// Served instead of the stub when running as a server.
-pub const POLL_REAL: &str = include_str!("../assets/poll.js");
+/// Live-reload client, shipped with every build: it subscribes to the
+/// dev server's `/events` stream and stays silent on static `file://` pages.
+pub const LIVE_JS: &str = include_str!("../assets/live.js");
 
 pub(crate) struct UiText {
     pub language: &'static str,
@@ -310,7 +309,7 @@ mod tests {
         assert!(page.contains("fy-search-toggle"));
         assert!(page.contains("fy-sidebar-resize"));
         assert!(page.contains("fy-docs.js"));
-        assert!(page.contains("_poll.js"));
+        assert!(page.contains("live.js"));
         assert!(!page.contains("{{"));
     }
 

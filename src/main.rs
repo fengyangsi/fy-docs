@@ -111,7 +111,6 @@ async fn dispatch(cli: Cli, cwd: &Path) -> Result<()> {
         None | Some(Command::Build) => {
             // Default: Full build of both HTML and PDF
             let ok = compiler::generate_into(&state, true, cli.lang.as_deref());
-            state.write_build();
             state::log(&format!(
                 "[fy-docs] generated {}",
                 state::display_path(&state.project.target_dir)
@@ -127,7 +126,6 @@ async fn dispatch(cli: Cli, cwd: &Path) -> Result<()> {
         Some(Command::Html) => {
             // HTML only (or with PDF if explicitly asked)
             let ok = compiler::generate_into(&state, cli.with_pdf, cli.lang.as_deref());
-            state.write_build();
             state::log(&format!(
                 "[fy-docs] HTML generated in {}",
                 state::display_path(&state.project.target_dir)
@@ -153,7 +151,6 @@ async fn dispatch(cli: Cli, cwd: &Path) -> Result<()> {
         Some(Command::Dev) | Some(Command::Serve) => {
             // Dev mode: live server + watcher
             compiler::generate_into(&state, cli.with_pdf, cli.lang.as_deref());
-            state.write_build();
             watcher::spawn(state.clone())?;
 
             let app = server::router(&state);
