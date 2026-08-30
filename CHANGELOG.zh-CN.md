@@ -7,6 +7,11 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本遵循 [语义化版本 2.0.0](https://semver.org/lang/zh-CN/)。
 
+## [0.1.2] - 2026-08-30
+
+### 新增
+- 增加对 Typst `html.frame(...)` 导出的内联 SVG 图表的全面主题自适应样式，自动响应全部 5 套主题（Light, Rust, Coal, Navy, Ayu）的卡片底色、边框、连线与文字，并支持图表节点超链接与微悬浮交互。
+
 ## [0.1.1] - 2026-08-30
 
 ### 变更

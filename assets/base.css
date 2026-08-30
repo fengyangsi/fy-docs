@@ -646,6 +646,82 @@ body {
 .fy-index-head .flex-1 { flex: 1; }
 .fy-index-head .fy-theme-select { flex-shrink: 0; }
 
+/* ---- SVG diagrams auto-theme & link interactions -------------------------- */
+
+.fy-doc svg {
+  max-width: 100%;
+  height: auto;
+  margin: 1.5em auto;
+  display: block;
+}
+
+/* SVG clickable nodes link styling & micro-interaction */
+.fy-doc svg a {
+  cursor: pointer;
+  text-decoration: none;
+}
+.fy-doc svg a:hover {
+  filter: brightness(0.92);
+  transition: filter 0.15s ease;
+}
+
+/* Light / Rust theme */
+html.light .fy-doc svg path[fill="#f1f5f9"] {
+  fill: #f1f5f9 !important;
+}
+html.rust .fy-doc svg path[fill="#f1f5f9"] {
+  fill: #e0ded4 !important;
+}
+html.rust .fy-doc svg path[stroke="#2563eb"] {
+  stroke: #2b79a2 !important;
+}
+html.rust .fy-doc svg use {
+  fill: #262625 !important;
+}
+html.rust .fy-doc svg path[stroke="#000000"] {
+  stroke: #524f46 !important;
+}
+html.rust .fy-doc svg path[fill="#000000"] {
+  fill: #524f46 !important;
+}
+
+/* Dark themes (coal, navy, ayu) */
+html.coal .fy-doc svg path[fill="#f1f5f9"],
+html.navy .fy-doc svg path[fill="#f1f5f9"],
+html.ayu .fy-doc svg path[fill="#f1f5f9"] {
+  fill: color-mix(in srgb, var(--ink) 9%, var(--bg)) !important;
+}
+
+html.coal .fy-doc svg path[stroke="#2563eb"],
+html.navy .fy-doc svg path[stroke="#2563eb"],
+html.ayu .fy-doc svg path[stroke="#2563eb"] {
+  stroke: var(--accent-note) !important;
+}
+
+html.coal .fy-doc svg use,
+html.navy .fy-doc svg use,
+html.ayu .fy-doc svg use {
+  fill: var(--ink) !important;
+}
+
+html.coal .fy-doc svg path[stroke="#000000"],
+html.navy .fy-doc svg path[stroke="#000000"],
+html.ayu .fy-doc svg path[stroke="#000000"] {
+  stroke: color-mix(in srgb, var(--ink) 45%, var(--bg)) !important;
+}
+
+html.coal .fy-doc svg path[fill="#000000"],
+html.navy .fy-doc svg path[fill="#000000"],
+html.ayu .fy-doc svg path[fill="#000000"] {
+  fill: color-mix(in srgb, var(--ink) 45%, var(--bg)) !important;
+}
+
+html.coal .fy-doc svg a:hover,
+html.navy .fy-doc svg a:hover,
+html.ayu .fy-doc svg a:hover {
+  filter: brightness(1.3);
+}
+
 @media print {
   .fy-topbar, .fy-sidebar, .fy-pager { display: none !important; }
   .fy-content { height: auto; overflow: visible; }
@@ -653,3 +729,4 @@ body {
   .fy-chapter { display: none; }
   .fy-chapter.fy-chapter-active { display: block; }
 }
+
