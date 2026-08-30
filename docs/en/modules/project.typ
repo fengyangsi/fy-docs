@@ -16,6 +16,10 @@ docs/
   `Project` automatically detects single-language (`docs/main.typ`) and multilingual (`docs/<lang>/main.typ`) directories. Each language target compiles to its own `index_<lang>.html` and versioned PDF.
 ]
 
+#contract[
+  A root `docs/main.typ` registers the always-included `default` target: any `--lang <LANG>` filter selects it alongside the requested language, so it compiles even when filtered. Projects wanting per-language isolation must keep language directories only (no root `main.typ`).
+]
+
 #invariant[
   Typst root sandbox (`root`) automatically defaults to the nearest ancestor satisfying all absolute imports, overridable via `--root <DIR>`.
 ]

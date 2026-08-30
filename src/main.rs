@@ -111,6 +111,9 @@ async fn dispatch(cli: Cli, cwd: &Path) -> Result<()> {
         None | Some(Command::Build) => {
             // Default: Full build of both HTML and PDF
             let ok = compiler::generate_into(&state, true, cli.lang.as_deref());
+            if !ok {
+                std::process::exit(1);
+            }
             state::log(&format!(
                 "[fy-docs] generated {}",
                 state::display_path(&state.project.target_dir)
@@ -119,13 +122,13 @@ async fn dispatch(cli: Cli, cwd: &Path) -> Result<()> {
                 let index_path = state.project.target_dir.join(compiler::INDEX_FILE);
                 let _ = open::that_detached(index_path);
             }
-            if !ok {
-                std::process::exit(1);
-            }
         }
         Some(Command::Html) => {
             // HTML only (or with PDF if explicitly asked)
             let ok = compiler::generate_into(&state, cli.with_pdf, cli.lang.as_deref());
+            if !ok {
+                std::process::exit(1);
+            }
             state::log(&format!(
                 "[fy-docs] HTML generated in {}",
                 state::display_path(&state.project.target_dir)
@@ -133,9 +136,6 @@ async fn dispatch(cli: Cli, cwd: &Path) -> Result<()> {
             if cli.open {
                 let index_path = state.project.target_dir.join(compiler::INDEX_FILE);
                 let _ = open::that_detached(index_path);
-            }
-            if !ok {
-                std::process::exit(1);
             }
         }
         Some(Command::Pdf) => {

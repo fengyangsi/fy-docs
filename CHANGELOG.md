@@ -7,6 +7,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- A partial-failure build no longer blanks `typst.css`: error pages only seed the file when absent, so the combined styles of successfully built languages survive.
+- A multi-language project with one surviving language keeps its routing landing page instead of having that page copied to `index.html`.
+- A failed build no longer logs "generated docs/target" before exiting non-zero.
+- The SSE stream no longer sends a duplicate seed frame; only actual rebuilds are pushed (`WatchStream::from_changes`).
+
 ## [0.1.7] - 2026-08-30
 
 ### Added

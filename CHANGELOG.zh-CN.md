@@ -7,6 +7,14 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本遵循 [语义化版本 2.0.0](https://semver.org/lang/zh-CN/)。
 
+## [Unreleased]
+
+### 修复
+- 部分失败的构建不再清空 `typst.css`：错误页仅在文件缺失时写入空样式，成功语言的合并样式得以保留。
+- 多语言项目仅剩一个成功语言时，保留语言路由分流页，不再把该语言页面复制为 `index.html`。
+- 构建失败时不再先打印 "generated docs/target" 再以非零码退出。
+- SSE 流不再发送重复的种子帧，仅推送真正的重建事件（`WatchStream::from_changes`）。
+
 ## [0.1.7] - 2026-08-30
 
 ### 新增

@@ -168,14 +168,17 @@ fn generate(project: &Project, with_pdf: bool, lang_filter: Option<&str>) -> Res
     }
 
     // Always leave an index.html behind: either a target wrote it directly,
-    // the single rendered page is copied, or multi-language (and fully
-    // failed) builds get the routing landing page.
+    // the page of a single-language project is copied, or multi-language
+    // builds (including partial failures) keep their routing landing page.
     let has_index = rendered_pages
         .iter()
         .any(|(t, ..)| t.html_file_name == INDEX_FILE)
         || failures.iter().any(|(t, _)| t.html_file_name == INDEX_FILE);
     if !has_index {
-        if rendered_pages.len() == 1 {
+        // The project is single-language only when *all* of its targets
+        // collapse to one; a multi-language project with one surviving page
+        // must still get the landing page so language routing survives.
+        if project.targets.len() == 1 && rendered_pages.len() == 1 {
             // Single-language subfolder: copy page directly to index.html
             let (first_target, title, body) = &rendered_pages[0];
             let default_page = crate::assets::doc_page(
@@ -449,7 +452,12 @@ fn write_error_page(
     write_atomic(&target.join(file_name), &page)?;
     write_atomic(&target.join(SKIN_FILE), crate::assets::BASE_CSS)?;
     write_atomic(&target.join(VIEWER_JS_FILE), crate::assets::VIEWER_JS)?;
-    write_atomic(&target.join(TYPST_CSS_FILE), "")?;
+    // Only seed typst.css when absent: in a partial failure the combined
+    // styles of the successful targets are already on disk and must survive.
+    let typst_css = target.join(TYPST_CSS_FILE);
+    if !typst_css.exists() {
+        write_atomic(&typst_css, "")?;
+    }
     write_atomic(&target.join(LIVE_JS_FILE), crate::assets::LIVE_JS)?;
     Ok(())
 }
@@ -546,6 +554,31 @@ mod tests {
         assert!(page.contains("<html lang=\"zh-CN\">"));
         // The landing page must stay untouched by error output.
         assert!(!temp.join("docs/target/index.html").is_file());
+
+        let _ = fs::remove_dir_all(temp);
+    }
+
+    #[test]
+    fn error_page_preserves_combined_typst_styles() {
+        let temp = std::env::temp_dir().join(format!("fy-docs-errcss-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&temp);
+        fs::create_dir_all(temp.join("docs/target")).unwrap();
+        let project = test_project(&temp.join("docs"));
+
+        // A partial failure: the successful targets already wrote their
+        // combined styles; the error page must not blank them out.
+        fs::write(temp.join("docs/target/typst.css"), ".combined{color:teal}").unwrap();
+        write_error_page(&project, "boom", "index_en.html", "en").unwrap();
+        assert_eq!(
+            fs::read_to_string(temp.join("docs/target/typst.css")).unwrap(),
+            ".combined{color:teal}"
+        );
+
+        // With no styles on disk yet (everything failed) the error page
+        // seeds an empty typst.css so the shell still loads.
+        fs::remove_file(temp.join("docs/target/typst.css")).unwrap();
+        write_error_page(&project, "boom", "index_en.html", "en").unwrap();
+        assert!(temp.join("docs/target/typst.css").is_file());
 
         let _ = fs::remove_dir_all(temp);
     }

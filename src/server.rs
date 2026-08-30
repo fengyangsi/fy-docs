@@ -7,8 +7,8 @@ use axum::response::sse::{Event as SseEvent, KeepAlive, Sse};
 use axum::routing::get;
 use std::convert::Infallible;
 use std::sync::Arc;
+use tokio_stream::StreamExt;
 use tokio_stream::wrappers::WatchStream;
-use tokio_stream::{StreamExt, iter};
 use tower_http::services::ServeDir;
 
 pub fn router(state: &Arc<AppState>) -> Router {
@@ -17,15 +17,12 @@ pub fn router(state: &Arc<AppState>) -> Router {
         .route(
             "/events",
             get(move || {
-                // Seed the stream with the current id so a freshly opened
-                // page records its baseline before the next rebuild arrives.
-                let current = *events.borrow();
-                let seed = iter(vec![Ok::<_, Infallible>(
-                    SseEvent::default().data(current.to_string()),
-                )]);
-                let live = WatchStream::new(events.clone())
+                // Only changes stream (from_changes skips the channel's
+                // current value): live.js records its baseline from the page
+                // itself and reloads on the first differing id.
+                let live = WatchStream::from_changes(events.clone())
                     .map(|id| Ok::<_, Infallible>(SseEvent::default().data(id.to_string())));
-                async move { Sse::new(seed.chain(live)).keep_alive(KeepAlive::default()) }
+                async move { Sse::new(live).keep_alive(KeepAlive::default()) }
             }),
         )
         .fallback_service(ServeDir::new(&state.project.target_dir))
@@ -41,7 +38,7 @@ mod tests {
     use tower::ServiceExt;
 
     #[tokio::test]
-    async fn events_endpoint_streams_the_current_build_id() {
+    async fn events_endpoint_pushes_each_rebuild() {
         let temp = std::env::temp_dir().join(format!("fy-docs-server-test-{}", std::process::id()));
         std::fs::create_dir_all(&temp).unwrap();
         let project = Project {
@@ -57,7 +54,6 @@ mod tests {
             watch_dirs: Vec::new(),
         };
         let state = Arc::new(AppState::new(project));
-        state.bump_build();
         let app = router(&state);
 
         let response = app
@@ -78,7 +74,9 @@ mod tests {
                 .unwrap(),
             "text/event-stream"
         );
-        // The seed frame carries the current build id.
+        // from_changes skips the channel's current value: the first frame
+        // arrives only when a rebuild happens, and no duplicate seed is sent.
+        state.bump_build();
         let mut body = response.into_body();
         let frame = body.frame().await.unwrap().unwrap();
         let data = frame.into_data().unwrap();
