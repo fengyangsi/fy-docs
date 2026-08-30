@@ -6,69 +6,82 @@ use std::path::{Path, PathBuf};
 
 /// A target language document within a project.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct LanguageTarget {
+pub(crate) struct LanguageTarget {
     /// Language identifier, e.g. "zh-CN", "en", "zh-TW", or empty string for default.
-    pub lang: String,
+    pub(crate) lang: String,
     /// Display name in language switcher, e.g. "简体中文", "English".
-    pub display_name: String,
+    pub(crate) display_name: String,
     /// Path to entry `main.typ` for this language.
-    pub entry: PathBuf,
+    pub(crate) entry: PathBuf,
     /// Output html filename, e.g. "index.html" or "index_zh-CN.html".
-    pub html_file_name: String,
+    pub(crate) html_file_name: String,
     /// Release PDF filename.
-    pub pdf_file_name: String,
+    pub(crate) pdf_file_name: String,
 }
 
 /// A documentation project: `<cwd>/docs/` plus everything needed to compile,
 /// build, and serve single or multi-language specifications.
 #[derive(Debug, Clone)]
-pub struct Project {
+pub(crate) struct Project {
     /// Package name (Cargo.toml `name`, else the directory name).
-    pub name: String,
+    pub(crate) name: String,
     /// Package version (Cargo.toml, else `version:` in main.typ, else 0.1.0).
-    pub version: String,
+    pub(crate) version: String,
     /// GitHub repository URL from Cargo.toml, when supplied.
-    pub repository: Option<String>,
-    /// Primary entry `main.typ` (for backward compatibility / default).
-    #[allow(dead_code)]
-    pub entry: PathBuf,
+    pub(crate) repository: Option<String>,
     /// All detected language targets (single-language or i18n).
-    pub targets: Vec<LanguageTarget>,
+    pub(crate) targets: Vec<LanguageTarget>,
     /// The `docs/` source directory.
-    pub docs_dir: PathBuf,
+    pub(crate) docs_dir: PathBuf,
     /// Typst compile root: the ancestor directory that satisfies every
     /// absolute `#import "/..."` used by the sources.
-    pub root: PathBuf,
+    pub(crate) root: PathBuf,
     /// Generated HTML output: `docs/target/`.
-    pub target_dir: PathBuf,
+    pub(crate) target_dir: PathBuf,
     /// Versioned PDF directory: `docs/release/`.
-    pub release_dir: PathBuf,
+    pub(crate) release_dir: PathBuf,
     /// Extra directories to watch for changes (imported local packages).
-    pub watch_dirs: Vec<PathBuf>,
+    pub(crate) watch_dirs: Vec<PathBuf>,
+}
+
+/// Directories under `docs/` that hold generated output rather than sources, so
+/// they can never be language targets.
+const GENERATED_DOC_DIRS: &[&str] = &["target", "release"];
+
+/// Normalizes a language tag for comparison: trimmed, lowercase, and with `_`
+/// interchangeable with `-`, so `zh_CN` and `ZH-cn` both mean `zh-CN`.
+pub(crate) fn normalize_lang(lang: &str) -> String {
+    lang.trim().to_lowercase().replace('_', "-")
 }
 
 impl Project {
-    /// File name of the default release PDF: `{name}_v{version}_specification.pdf`.
-    #[allow(dead_code)]
-    pub fn pdf_file_name(&self) -> String {
-        format!("{}_v{}_specification.pdf", self.name, self.version)
-    }
-
     /// Selects targets matching an optional language filter.
-    pub fn selected_targets(&self, lang_filter: Option<&str>) -> Vec<&LanguageTarget> {
-        match lang_filter {
-            Some(filter) => self
-                .targets
-                .iter()
-                .filter(|t| t.lang.eq_ignore_ascii_case(filter) || t.lang.is_empty())
-                .collect(),
-            None => self.targets.iter().collect(),
+    ///
+    /// The `default` target (a root `main.typ`) rides along only when the
+    /// filter matched at least one named language: a filter that matches
+    /// nothing selects nothing, so the caller surfaces the typo instead of
+    /// quietly building the default page.
+    pub(crate) fn selected_targets(&self, lang_filter: Option<&str>) -> Vec<&LanguageTarget> {
+        let Some(filter) = lang_filter else {
+            return self.targets.iter().collect();
+        };
+        let filter = normalize_lang(filter);
+        let matched = self
+            .targets
+            .iter()
+            .any(|t| !t.lang.is_empty() && normalize_lang(&t.lang) == filter);
+        if !matched {
+            return Vec::new();
         }
+        self.targets
+            .iter()
+            .filter(|t| t.lang.is_empty() || normalize_lang(&t.lang) == filter)
+            .collect()
     }
 }
 
 /// Maps language codes to user-friendly native display labels.
-pub fn lang_display_name(lang: &str) -> String {
+pub(crate) fn lang_display_name(lang: &str) -> String {
     match lang.to_lowercase().replace('_', "-").as_str() {
         "zh" | "zh-cn" | "zh-hans" => "简体中文".to_owned(),
         "zh-tw" | "zh-hk" | "zh-hant" => "繁體中文".to_owned(),
@@ -82,7 +95,7 @@ pub fn lang_display_name(lang: &str) -> String {
     }
 }
 
-pub fn clean_canonicalize(path: &Path) -> Result<PathBuf> {
+pub(crate) fn clean_canonicalize(path: &Path) -> Result<PathBuf> {
     let p = path.canonicalize().context("path does not exist")?;
     #[cfg(windows)]
     {
@@ -94,7 +107,7 @@ pub fn clean_canonicalize(path: &Path) -> Result<PathBuf> {
     Ok(p)
 }
 
-pub fn detect(cwd: &Path, root_override: Option<&Path>) -> Result<Project> {
+pub(crate) fn detect(cwd: &Path, root_override: Option<&Path>) -> Result<Project> {
     let docs_dir = cwd.join("docs");
     if !docs_dir.is_dir() {
         bail!(
@@ -143,7 +156,6 @@ pub fn detect(cwd: &Path, root_override: Option<&Path>) -> Result<Project> {
         name,
         version,
         repository: meta.repository,
-        entry: primary_entry,
         targets,
         docs_dir,
         root,
@@ -168,11 +180,10 @@ fn detect_language_targets(
             let path = entry.path();
             if path.is_dir() {
                 let dir_name = entry.file_name().to_string_lossy().into_owned();
-                // Skip non-language directories
-                if matches!(
-                    dir_name.as_str(),
-                    "target" | "release" | "fy-spec" | "modules"
-                ) {
+                // Generated output is the only thing that can never be a
+                // language: every other directory qualifies through its own
+                // main.typ, so shared folders like fy-spec/ need no denylist.
+                if GENERATED_DOC_DIRS.contains(&dir_name.as_str()) {
                     continue;
                 }
                 let sub_main = path.join("main.typ");
@@ -278,7 +289,8 @@ fn collect_imports(dir: &Path, imports: &mut Vec<String>) {
     for entry in entries.flatten() {
         let path = entry.path();
         if path.is_dir() {
-            if path.file_name().is_some_and(|n| n == "target") {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            if GENERATED_DOC_DIRS.contains(&name.as_str()) {
                 continue; // generated output, never imported
             }
             collect_imports(&path, imports);
@@ -286,31 +298,55 @@ fn collect_imports(dir: &Path, imports: &mut Vec<String>) {
             && let Ok(text) = std::fs::read_to_string(&path)
         {
             for line in text.lines() {
-                if !line.contains("import") {
-                    continue;
-                }
-                for quoted in line.split('"').skip(1).step_by(2) {
-                    if let Some(rel) = quoted.strip_prefix('/')
-                        && rel.ends_with(".typ")
-                    {
-                        imports.push(rel.to_owned());
-                    }
+                if line.contains("import") {
+                    imports.extend(quoted_absolute_typs(line));
                 }
             }
         }
     }
 }
 
+/// Extracts the root-relative `.typ` paths quoted on a single source line.
+/// Both quote styles are recognized and everything after `//` is a comment, so
+/// a commented-out `#import` cannot drag root detection to the wrong ancestor.
+fn quoted_absolute_typs(line: &str) -> Vec<String> {
+    let chars: Vec<char> = line.chars().collect();
+    let mut found = Vec::new();
+    let mut i = 0;
+    while i < chars.len() {
+        match chars[i] {
+            '/' if chars.get(i + 1) == Some(&'/') => break,
+            quote @ ('"' | '\'') => {
+                let open = i + 1;
+                // An unterminated literal makes the rest of the line
+                // untrustworthy; typst would reject the file anyway.
+                let Some(len) = chars[open..].iter().position(|c| *c == quote) else {
+                    break;
+                };
+                let text: String = chars[open..open + len].iter().collect();
+                if let Some(rel) = text.strip_prefix('/')
+                    && rel.ends_with(".typ")
+                {
+                    found.push(rel.to_owned());
+                }
+                i = open + len + 1;
+            }
+            _ => i += 1,
+        }
+    }
+    found
+}
+
 /// Package metadata read from `Cargo.toml`, honoring `workspace = true`
 /// inheritance for scalar fields.
 #[derive(Debug, Default, PartialEq, Eq)]
 pub(crate) struct CargoMeta {
-    pub name: Option<String>,
-    pub version: Option<String>,
+    pub(crate) name: Option<String>,
+    pub(crate) version: Option<String>,
     /// A GitHub repository URL, when the manifest declares one.
-    pub repository: Option<String>,
+    pub(crate) repository: Option<String>,
     /// The first `authors` entry, when declared directly in the manifest.
-    pub author: Option<String>,
+    pub(crate) author: Option<String>,
 }
 
 /// Reads `[package]` metadata from `Cargo.toml`, if present.
@@ -414,34 +450,37 @@ fn workspace_package_value(start: &Path, key: &str) -> Option<String> {
 
 /// Falls back to the `version: "..."` argument of the document template.
 fn main_typ_version(entry: &Path) -> Option<String> {
-    let text = std::fs::read_to_string(entry).ok()?;
-    let pos = text.find("version:")?;
-    let rest = &text[pos + "version:".len()..];
-    let from = rest.find('"')? + 1;
-    let to = rest[from..].find('"')? + from;
-    Some(rest[from..to].to_owned())
+    parse_main_typ_version(&std::fs::read_to_string(entry).ok()?)
+}
+
+/// Reads the template's `version:` argument from live code only. A mention
+/// inside a comment must not become the project version, and an occurrence
+/// without a quoted value is skipped rather than ending the search.
+fn parse_main_typ_version(text: &str) -> Option<String> {
+    for line in text.lines() {
+        let code = match line.find("//") {
+            Some(cut) => &line[..cut],
+            None => line,
+        };
+        let Some(at) = code.find("version:") else {
+            continue;
+        };
+        let rest = &code[at + "version:".len()..];
+        let Some(open) = rest.find('"') else {
+            continue;
+        };
+        let from = open + 1;
+        let Some(close) = rest[from..].find('"') else {
+            continue;
+        };
+        return Some(rest[from..from + close].to_owned());
+    }
+    None
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn names_pdf_as_a_document_release() {
-        let project = Project {
-            name: "fy-docs".to_owned(),
-            version: "0.1.0".to_owned(),
-            repository: None,
-            entry: PathBuf::new(),
-            targets: Vec::new(),
-            docs_dir: PathBuf::new(),
-            root: PathBuf::new(),
-            target_dir: PathBuf::new(),
-            release_dir: PathBuf::new(),
-            watch_dirs: Vec::new(),
-        };
-        assert_eq!(project.pdf_file_name(), "fy-docs_v0.1.0_specification.pdf");
-    }
 
     #[test]
     fn reads_package_metadata_from_valid_toml() {
@@ -478,5 +517,100 @@ mod tests {
         assert_eq!(content, "/existing\n/docs/target/\n");
 
         let _ = std::fs::remove_dir_all(&temp);
+    }
+
+    fn project_with_langs(langs: &[&str]) -> Project {
+        let target = |lang: &str| LanguageTarget {
+            lang: lang.to_owned(),
+            display_name: lang_display_name(lang),
+            entry: PathBuf::new(),
+            html_file_name: if lang.is_empty() {
+                "index.html".to_owned()
+            } else {
+                format!("index_{lang}.html")
+            },
+            pdf_file_name: format!("demo_{lang}.pdf"),
+        };
+        Project {
+            name: "demo".to_owned(),
+            version: "0.1.0".to_owned(),
+            repository: None,
+            targets: langs.iter().map(|lang| target(lang)).collect(),
+            docs_dir: PathBuf::new(),
+            root: PathBuf::new(),
+            target_dir: PathBuf::new(),
+            release_dir: PathBuf::new(),
+            watch_dirs: Vec::new(),
+        }
+    }
+
+    fn selected_langs(project: &Project, filter: Option<&str>) -> Vec<String> {
+        project
+            .selected_targets(filter)
+            .into_iter()
+            .map(|t| t.lang.clone())
+            .collect()
+    }
+
+    #[test]
+    fn normalize_lang_folds_case_and_separators() {
+        assert_eq!(normalize_lang("ZH_CN"), "zh-cn");
+        assert_eq!(normalize_lang(" en "), "en");
+        assert_eq!(normalize_lang(""), "");
+    }
+
+    #[test]
+    fn lang_filter_accepts_case_and_separator_variants() {
+        let project = project_with_langs(&["", "zh-CN", "en"]);
+        for variant in ["zh-CN", "zh-cn", "ZH_CN", "zh_CN", " Zh-Cn "] {
+            assert_eq!(
+                selected_langs(&project, Some(variant)),
+                vec![String::new(), "zh-CN".to_owned()],
+                "`{variant}` must select the zh-CN target alongside the default"
+            );
+        }
+        assert_eq!(
+            selected_langs(&project, Some("en")),
+            vec![String::new(), "en".to_owned()]
+        );
+        assert_eq!(selected_langs(&project, None).len(), 3);
+    }
+
+    #[test]
+    fn unmatched_lang_filter_selects_nothing() {
+        // A root main.typ must not mask a typo: falling back to "default only"
+        // would exit 0 having built something nobody asked for.
+        let project = project_with_langs(&["", "zh-CN", "en"]);
+        assert!(project.selected_targets(Some("zz")).is_empty());
+        assert!(project.selected_targets(Some("zh")).is_empty());
+
+        let single_language = project_with_langs(&[""]);
+        assert!(single_language.selected_targets(Some("en")).is_empty());
+    }
+
+    #[test]
+    fn version_fallback_reads_live_code_only() {
+        let text = "// version: \"9.9.9\"\n#show: project_book.with(\n  title: \"x\", // version: \"8.8.8\"\n  version: none,\n  version: \"1.2.3\",\n)\n";
+        assert_eq!(parse_main_typ_version(text).as_deref(), Some("1.2.3"));
+        assert_eq!(parse_main_typ_version("// version: \"1.0.0\""), None);
+        assert_eq!(parse_main_typ_version("no version here"), None);
+    }
+
+    #[test]
+    fn import_scan_handles_quotes_and_comments() {
+        assert_eq!(
+            quoted_absolute_typs(r#"#import "/pkg/lib.typ": *"#),
+            vec!["pkg/lib.typ".to_owned()]
+        );
+        assert_eq!(
+            quoted_absolute_typs(r#"#import '/pkg/lib.typ': *"#),
+            vec!["pkg/lib.typ".to_owned()]
+        );
+        assert!(quoted_absolute_typs(r#"// #import "/stale/lib.typ": *"#).is_empty());
+        assert_eq!(
+            quoted_absolute_typs(r#"#import "/a.typ": x // "/b.typ""#),
+            vec!["a.typ".to_owned()]
+        );
+        assert!(quoted_absolute_typs(r#"#import "relative/lib.typ": *"#).is_empty());
     }
 }

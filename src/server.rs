@@ -11,7 +11,7 @@ use tokio_stream::StreamExt;
 use tokio_stream::wrappers::WatchStream;
 use tower_http::services::ServeDir;
 
-pub fn router(state: &Arc<AppState>) -> Router {
+pub(crate) fn router(state: &Arc<AppState>) -> Router {
     let events = state.subscribe();
     Router::new()
         .route(
@@ -47,7 +47,6 @@ mod tests {
             name: "test".to_owned(),
             version: "0.1.0".to_owned(),
             repository: None,
-            entry: temp.join("main.typ"),
             targets: Vec::new(),
             docs_dir: temp.clone(),
             root: temp.clone(),
@@ -105,7 +104,6 @@ mod tests {
             name: "test".to_owned(),
             version: "0.1.0".to_owned(),
             repository: None,
-            entry: temp.join("main.typ"),
             targets: Vec::new(),
             docs_dir: temp.clone(),
             root: temp.clone(),

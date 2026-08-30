@@ -32,7 +32,7 @@ This document was initialized by `cargo fy-docs init`. Add your module specifica
 ///
 /// Refuses to overwrite an existing `docs/main.typ` — the user must remove it
 /// explicitly before re-initializing.
-pub fn init(cwd: &Path) -> Result<()> {
+pub(crate) fn init(cwd: &Path) -> Result<()> {
     let docs_dir = cwd.join("docs");
     let entry = docs_dir.join("main.typ");
 
@@ -84,7 +84,7 @@ pub fn init(cwd: &Path) -> Result<()> {
 /// Writes (or, with `check`, only verifies) the embedded fy-spec template at
 /// `docs/fy-spec/lib.typ`, keeping every project on the template version
 /// shipped with the installed fy-docs binary. Needs no typst binary.
-pub fn vendor(cwd: &Path, check: bool) -> Result<()> {
+pub(crate) fn vendor(cwd: &Path, check: bool) -> Result<()> {
     let docs_dir = cwd.join("docs");
     if !docs_dir.is_dir() {
         bail!(

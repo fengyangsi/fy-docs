@@ -141,11 +141,16 @@ async fn dispatch(cli: Cli, cwd: &Path) -> Result<()> {
         Some(Command::Pdf) => {
             // PDF 2.0 specifications only
             let paths = compiler::compile_pdf(&state.project, cli.lang.as_deref())?;
-            for path in paths {
+            for path in &paths {
                 state::log(&format!(
                     "[fy-docs] PDF written to {}",
-                    state::display_path(&path)
+                    state::display_path(path)
                 ));
+            }
+            if cli.open {
+                if let Some(first) = paths.first() {
+                    let _ = open::that_detached(first);
+                }
             }
         }
         Some(Command::Dev) | Some(Command::Serve) => {

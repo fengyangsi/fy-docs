@@ -7,3 +7,7 @@ The `server` module runs exclusively under `cargo fy-docs dev`, providing an Axu
 #contract[
   `server` binds to `127.0.0.1:8181` (auto-incrementing upon port collision) and exposes a `/events` Server-Sent-Events stream that pushes a new build id after every rebuild; open pages reload themselves the moment the id changes. The same `live.js` client ships with static builds, where the failed connection closes silently.
 ]
+
+#contract[
+  The watcher merges change bursts through a debounce window: consecutive saves within a quiet period trigger one build, but the wait carries an overall cap measured from the first change, so a process continuously writing sources can never starve rebuilds.
+]

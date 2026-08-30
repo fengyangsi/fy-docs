@@ -125,3 +125,84 @@ fn vendor_check_flags_a_drifted_template() {
         .unwrap();
     assert_eq!(drifted.status.code(), Some(1));
 }
+
+#[test]
+fn unknown_lang_filter_fails_instead_of_building_the_default() {
+    if !typst_available() {
+        eprintln!("skipping: typst is not on PATH");
+        return;
+    }
+    let temp = tempfile::tempdir().unwrap();
+    binary()
+        .arg("init")
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    // A typo must not exit 0 with only the default page built.
+    let typo = binary()
+        .args(["html", "--lang", "zz"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert_eq!(typo.status.code(), Some(1), "an unknown language must fail");
+    let stderr = String::from_utf8_lossy(&typo.stderr);
+    assert!(stderr.contains("`zz`"), "{stderr}");
+    assert!(stderr.contains("default"), "{stderr}");
+
+    // A real language written with the wrong case or separator still resolves.
+    let main = std::fs::read_to_string(temp.path().join("docs/main.typ")).unwrap();
+    std::fs::create_dir_all(temp.path().join("docs/zh-CN")).unwrap();
+    std::fs::write(
+        temp.path().join("docs/zh-CN/main.typ"),
+        main.replace("\"fy-spec/lib.typ\"", "\"../fy-spec/lib.typ\""),
+    )
+    .unwrap();
+    let built = binary()
+        .args(["html", "--lang", "ZH_cn"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        built.status.success(),
+        "build failed: {}",
+        String::from_utf8_lossy(&built.stderr)
+    );
+    assert!(temp.path().join("docs/target/index_zh-CN.html").is_file());
+}
+
+#[test]
+fn successful_build_surfaces_typst_warnings() {
+    if !typst_available() {
+        eprintln!("skipping: typst is not on PATH");
+        return;
+    }
+    let temp = tempfile::tempdir().unwrap();
+    binary()
+        .arg("init")
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    // `v` carries no meaning in HTML export, so typst warns while still
+    // succeeding: exactly the class of signal fy-docs used to discard.
+    let entry = temp.path().join("docs/main.typ");
+    let mut main = std::fs::read_to_string(&entry).unwrap();
+    main.push_str("\n#v(1em)\n");
+    std::fs::write(&entry, main).unwrap();
+
+    let build = binary()
+        .arg("html")
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        build.status.success(),
+        "a warning must not fail the build: {}",
+        String::from_utf8_lossy(&build.stderr)
+    );
+    let stderr = String::from_utf8_lossy(&build.stderr);
+    assert!(
+        stderr.to_lowercase().contains("warning"),
+        "typst warnings must reach stderr: {stderr}"
+    );
+}

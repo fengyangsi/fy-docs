@@ -3,27 +3,27 @@
 use crate::project::LanguageTarget;
 
 const DOC_TEMPLATE: &str = include_str!("../assets/doc.html");
-pub const BASE_CSS: &str = include_str!("../assets/base.css");
-pub const VIEWER_JS: &str = include_str!("../assets/viewer.js");
+pub(crate) const BASE_CSS: &str = include_str!("../assets/base.css");
+pub(crate) const VIEWER_JS: &str = include_str!("../assets/viewer.js");
 /// Live-reload client, shipped with every build: it subscribes to the
 /// dev server's `/events` stream and stays silent on static `file://` pages.
-pub const LIVE_JS: &str = include_str!("../assets/live.js");
+pub(crate) const LIVE_JS: &str = include_str!("../assets/live.js");
 
 pub(crate) struct UiText {
-    pub language: &'static str,
-    pub sidebar_toggle: &'static str,
-    pub theme: &'static str,
-    pub system_theme: &'static str,
-    pub search: &'static str,
-    pub search_document: &'static str,
-    pub search_placeholder: &'static str,
-    pub print: &'static str,
-    pub table_of_contents: &'static str,
-    pub github: &'static str,
-    pub language_label: &'static str,
-    pub compile_failed: &'static str,
-    pub compile_failed_detail: &'static str,
-    pub compile_failed_hint: &'static str,
+    pub(crate) language: &'static str,
+    pub(crate) sidebar_toggle: &'static str,
+    pub(crate) theme: &'static str,
+    pub(crate) system_theme: &'static str,
+    pub(crate) search: &'static str,
+    pub(crate) search_document: &'static str,
+    pub(crate) search_placeholder: &'static str,
+    pub(crate) print: &'static str,
+    pub(crate) table_of_contents: &'static str,
+    pub(crate) github: &'static str,
+    pub(crate) language_label: &'static str,
+    pub(crate) compile_failed: &'static str,
+    pub(crate) compile_failed_detail: &'static str,
+    pub(crate) compile_failed_hint: &'static str,
 }
 
 /// Chooses the UI language from the document's declared language when a
@@ -75,7 +75,7 @@ pub(crate) fn ui_text(lang_hint: Option<&str>, body: &str) -> UiText {
 
 /// Renders the generated page. The Typst body is already trimmed; GitHub is
 /// linked only when the package declares that repository.
-pub fn doc_page(
+pub(crate) fn doc_page(
     title: &str,
     name: &str,
     repository: Option<&str>,
@@ -202,7 +202,7 @@ fn escape_js_string(text: &str) -> String {
 }
 
 /// Renders a tiny (~500B) client-side language routing landing page with dynamic matching.
-pub fn redirect_page(all_targets: &[LanguageTarget]) -> String {
+pub(crate) fn redirect_page(all_targets: &[LanguageTarget]) -> String {
     let distinct: Vec<&LanguageTarget> =
         all_targets.iter().filter(|t| !t.lang.is_empty()).collect();
 

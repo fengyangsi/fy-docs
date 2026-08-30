@@ -8,11 +8,19 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-pub const INDEX_FILE: &str = "index.html";
-pub const SKIN_FILE: &str = "fy-docs.css";
-pub const TYPST_CSS_FILE: &str = "typst.css";
-pub const VIEWER_JS_FILE: &str = "fy-docs.js";
-pub const LIVE_JS_FILE: &str = "live.js";
+pub(crate) const INDEX_FILE: &str = "index.html";
+pub(crate) const SKIN_FILE: &str = "fy-docs.css";
+pub(crate) const TYPST_CSS_FILE: &str = "typst.css";
+pub(crate) const VIEWER_JS_FILE: &str = "fy-docs.js";
+pub(crate) const LIVE_JS_FILE: &str = "live.js";
+
+/// Prefix of the throwaway HTML file each language target compiles through.
+const TEMP_PREFIX: &str = "_temp_";
+
+/// Outputs older fy-docs wrote into `docs/target/` and current code no longer
+/// does: the polling reload client and its build marker, both replaced by the
+/// SSE `/events` stream. Without a sweep they survive an upgrade forever.
+const RETIRED_OUTPUTS: &[&str] = &["_poll.js", "_build"];
 
 /// The oldest typst release that accepts every flag fy-docs passes:
 /// `--pdf-standard 2.0` first shipped in Typst 0.14.
@@ -20,7 +28,7 @@ const MINIMUM_TYPST: (u64, u64, u64) = (0, 14, 0);
 
 /// Verifies that the `typst` CLI exists and is new enough for the flags
 /// fy-docs passes (`--features html`, `--pdf-standard 2.0`).
-pub fn precheck() -> Result<()> {
+pub(crate) fn precheck() -> Result<()> {
     let output = Command::new("typst").arg("--version").output().context(
         "typst was not found on PATH — install Typst 0.14 or later \
              (https://github.com/typst/typst/releases)",
@@ -54,7 +62,7 @@ fn typst_banner_version(banner: &str) -> Option<(u64, u64, u64)> {
 /// Generates HTML page(s) into `docs/target/`, optionally with PDF(s).
 /// Failures become visible error pages at the affected targets; returns
 /// `false` when anything failed so batch commands can exit non-zero.
-pub fn generate_into(state: &AppState, with_pdf: bool, lang_filter: Option<&str>) -> bool {
+pub(crate) fn generate_into(state: &AppState, with_pdf: bool, lang_filter: Option<&str>) -> bool {
     crate::state::log(&format!(
         "[fy-docs] compiling `{}` (v{})...",
         state.project.name, state.project.version
@@ -78,17 +86,13 @@ type HtmlParts = (String, String, String);
 fn generate(project: &Project, with_pdf: bool, lang_filter: Option<&str>) -> Result<()> {
     let target = &project.target_dir;
     fs::create_dir_all(target)?;
+    clean_stale_outputs(target)?;
 
-    let selected_targets = project.selected_targets(lang_filter);
-    if selected_targets.is_empty() {
-        bail!(
-            "no matching documentation language targets found for filter {:?}",
-            lang_filter
-        );
-    }
+    let selected_targets = select_targets(project, lang_filter)?;
 
     if with_pdf && let Err(err) = compile_pdf(project, lang_filter) {
         write_error_pages(project, &selected_targets, &format!("{err:#}"));
+        ensure_landing_page(project, target)?;
         return Err(err);
     }
 
@@ -211,6 +215,27 @@ fn generate(project: &Project, with_pdf: bool, lang_filter: Option<&str>) -> Res
     }
 }
 
+/// Sweeps output a previous run could leave behind: intermediates from a
+/// compile that was killed mid-way, and artifacts newer fy-docs no longer
+/// writes but an upgraded project would keep serving.
+fn clean_stale_outputs(target: &Path) -> Result<()> {
+    for name in RETIRED_OUTPUTS {
+        let path = target.join(name);
+        if path.is_file() {
+            fs::remove_file(&path)
+                .with_context(|| format!("could not remove stale {}", path.display()))?;
+        }
+    }
+    for entry in fs::read_dir(target)?.flatten() {
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        if name.starts_with(TEMP_PREFIX) && name.ends_with(".html") {
+            let _ = fs::remove_file(entry.path());
+        }
+    }
+    Ok(())
+}
+
 /// Writes a file atomically: the content lands in a sibling temp file that
 /// is renamed over the destination, so a concurrent HTTP read from the dev
 /// server never observes a half-written page.
@@ -245,7 +270,7 @@ fn compile_html_target(
     target_dir: &Path,
 ) -> Result<HtmlParts> {
     let temp_html = target_dir.join(format!(
-        "_temp_{}_{}.html",
+        "{TEMP_PREFIX}{}_{}.html",
         if lang_target.lang.is_empty() {
             "root"
         } else {
@@ -286,15 +311,9 @@ fn compile_html_target(
 }
 
 /// Compiles the print-edition PDF 2.0 specifications into `docs/release/` in parallel.
-pub fn compile_pdf(project: &Project, lang_filter: Option<&str>) -> Result<Vec<PathBuf>> {
+pub(crate) fn compile_pdf(project: &Project, lang_filter: Option<&str>) -> Result<Vec<PathBuf>> {
     fs::create_dir_all(&project.release_dir)?;
-    let selected_targets = project.selected_targets(lang_filter);
-    if selected_targets.is_empty() {
-        bail!(
-            "no matching documentation language targets found for filter {:?}",
-            lang_filter
-        );
-    }
+    let selected_targets = select_targets(project, lang_filter)?;
 
     let (results, panic_note) = std::thread::scope(|s| {
         let mut handles = Vec::new();
@@ -347,20 +366,117 @@ fn ensure_gitignore(project: &Project, entries: &[&str]) {
     crate::project::ensure_gitignore(root, entries);
 }
 
+/// Resolves the language filter into targets, refusing a filter that matches
+/// no language so a typo cannot quietly build something else instead.
+fn select_targets<'a>(
+    project: &'a Project,
+    lang_filter: Option<&str>,
+) -> Result<Vec<&'a LanguageTarget>> {
+    let selected = project.selected_targets(lang_filter);
+    if selected.is_empty() {
+        let available = project
+            .targets
+            .iter()
+            .map(lang_label)
+            .collect::<Vec<_>>()
+            .join(", ");
+        match lang_filter {
+            Some(filter) => bail!(
+                "no documentation language target matches `{filter}`; \
+                 this project provides: {available}"
+            ),
+            None => bail!("this documentation project declares no language targets"),
+        }
+    }
+    Ok(selected)
+}
+
 fn run(cmd: &mut Command) -> Result<()> {
     let output = cmd
         .output()
         .context("failed to spawn `typst` (is it on PATH?)")?;
     if output.status.success() {
+        if let Some(note) = warnings_note(&output.stderr) {
+            crate::state::log(&note);
+        }
         return Ok(());
     }
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = crate::state::strip_verbatim(&String::from_utf8_lossy(&output.stderr));
+    let stdout = crate::state::strip_verbatim(&String::from_utf8_lossy(&output.stdout));
     if stderr.trim().is_empty() {
         bail!("{stdout}")
     } else {
         bail!("{stderr}")
     }
+}
+
+/// Builds the line forwarding typst's stderr from a *successful* compile.
+/// Warnings change the artifact without failing it (substituted fonts,
+/// directives dropped by HTML export), so dropping them would hide real
+/// regressions behind a green build.
+///
+/// Absent font families are the one exception: a fallback chain deliberately
+/// lists candidates for several operating systems, and typst re-reports every
+/// unavailable one at each style site, so the repeats add nothing beyond the
+/// distinct names. They collapse into a single line; everything else is
+/// forwarded verbatim.
+fn warnings_note(stderr: &[u8]) -> Option<String> {
+    let text = String::from_utf8_lossy(stderr).trim().to_owned();
+    let mut missing_fonts: Vec<String> = Vec::new();
+    let mut kept: Vec<String> = Vec::new();
+    for block in split_warning_blocks(&text) {
+        let block = block.trim();
+        if block.is_empty() {
+            continue;
+        }
+        // An unrecognized block shape stays as typst wrote it: losing a warning
+        // to a parser assumption would be worse than the noise.
+        if let Some(family) = unmatched_font(block) {
+            if !missing_fonts.contains(&family) {
+                missing_fonts.push(family);
+            }
+        } else {
+            kept.push(block.to_owned());
+        }
+    }
+    if kept.is_empty() && missing_fonts.is_empty() {
+        return None;
+    }
+    let mut note = String::from("[fy-docs] typst reported warnings:");
+    for block in kept {
+        note.push('\n');
+        note.push_str(&block);
+    }
+    if !missing_fonts.is_empty() {
+        note.push_str(&format!(
+            "\nwarning: font families unavailable, fallback applied: {}",
+            missing_fonts.join(", ")
+        ));
+    }
+    Some(crate::state::strip_verbatim(&note))
+}
+
+/// Splits diagnostics into blocks at each line that starts a new warning,
+/// independent of the blank-line separators typst happens to emit.
+fn split_warning_blocks(text: &str) -> Vec<String> {
+    let mut blocks: Vec<String> = Vec::new();
+    for line in text.lines() {
+        if blocks.is_empty() || line.starts_with("warning:") {
+            blocks.push(line.to_owned());
+        } else if let Some(last) = blocks.last_mut() {
+            last.push('\n');
+            last.push_str(line);
+        }
+    }
+    blocks
+}
+
+/// Extracts the family name from a typst "unknown font family" warning.
+fn unmatched_font(block: &str) -> Option<String> {
+    let line = block.lines().next()?.trim();
+    let message = line.strip_prefix("warning:")?.trim();
+    let family = message.strip_prefix("unknown font family:")?.trim();
+    (!family.is_empty()).then(|| family.to_lowercase())
 }
 
 /// Formats a panicked thread's payload for an error summary.
@@ -390,19 +506,48 @@ fn extract_body(html: &str) -> Option<String> {
     Some(html[from..to].to_owned())
 }
 
+/// Concatenates every `<style>` block's CSS from a typst HTML export. The
+/// opening tag may carry attributes (`<style media="print">`), and a missed
+/// block would silently drop a real stylesheet, so the scan tolerates them the
+/// way [`extract_body`] tolerates them on `<body>`.
 fn extract_all_styles(html: &str) -> String {
+    const OPEN: &str = "<style";
     let mut styles = String::new();
     let mut rest = html;
-    while let Some(pos) = rest.find("<style>") {
-        let after = &rest[pos + "<style>".len()..];
-        let Some(end) = after.find("</style>") else {
+    while let Some(pos) = rest.find(OPEN) {
+        let mut tail = &rest[pos + OPEN.len()..];
+        // Only a real tag: a bare end or the start of an attribute list.
+        if !tail.starts_with(['>', ' ', '\t', '\n', '\r']) {
+            rest = tail;
+            continue;
+        }
+        let Some(open_end) = tail.find('>') else {
             break;
         };
-        styles.push_str(&after[..end]);
+        tail = &tail[open_end + 1..];
+        let Some(end) = tail.find("</style>") else {
+            break;
+        };
+        styles.push_str(&tail[..end]);
         styles.push('\n');
-        rest = &after[end + "</style>".len()..];
+        rest = &tail[end + "</style>".len()..];
     }
     styles
+}
+
+/// Guarantees a root `index.html` after a build that wrote no pages. A pure
+/// i18n project owns `index.html` through no single target, so without it the
+/// dev server has no route for `/`. An existing landing page is left alone.
+fn ensure_landing_page(project: &Project, target: &Path) -> Result<()> {
+    let index = target.join(INDEX_FILE);
+    let owned_by_target = project
+        .targets
+        .iter()
+        .any(|t| t.html_file_name == INDEX_FILE);
+    if owned_by_target || index.is_file() {
+        return Ok(());
+    }
+    write_atomic(&index, &crate::assets::redirect_page(&project.targets))
 }
 
 /// Renders the compile failure as an error page at every given target so
@@ -515,6 +660,12 @@ mod tests {
     }
 
     #[test]
+    fn extract_all_styles_reads_attributed_tags_only() {
+        let html = r#"<style media="print">a{}</style><styleset>x</styleset><style>b{}</style>"#;
+        assert_eq!(extract_all_styles(html), "a{}\nb{}\n");
+    }
+
+    #[test]
     fn formats_panic_payloads() {
         let text: Box<dyn std::any::Any + Send> = Box::new("boom");
         assert_eq!(panic_message(&text), "boom");
@@ -529,7 +680,6 @@ mod tests {
             name: "test".to_owned(),
             version: "0.1.0".to_owned(),
             repository: None,
-            entry: docs_dir.join("main.typ"),
             targets: Vec::new(),
             docs_dir: docs_dir.to_path_buf(),
             root: docs_dir.to_path_buf(),
@@ -579,6 +729,162 @@ mod tests {
         fs::remove_file(temp.join("docs/target/typst.css")).unwrap();
         write_error_page(&project, "boom", "index_en.html", "en").unwrap();
         assert!(temp.join("docs/target/typst.css").is_file());
+
+        let _ = fs::remove_dir_all(temp);
+    }
+
+    #[test]
+    fn warnings_note_folds_repeated_font_warnings() {
+        let stderr = concat!(
+            "warning: unknown font family: Noto Serif CJK SC\n",
+            "   ┌─ docs/fy-spec/lib.typ:297:10\n",
+            "297 │     font: active-fonts.serif,\n",
+            "\n",
+            "warning: unknown font family: noto serif cjk sc\n",
+            "   ┌─ docs/fy-spec/lib.typ:383:51\n",
+            "\n",
+            "warning: pagebreak was ignored during HTML export\n",
+            "   ┌─ docs/fy-spec/lib.typ:430:2\n",
+        );
+        let note = warnings_note(stderr.as_bytes()).unwrap();
+        assert!(note.starts_with("[fy-docs] typst reported warnings:"));
+        assert!(
+            note.contains("font families unavailable, fallback applied: noto serif cjk sc"),
+            "{note}"
+        );
+        assert_eq!(note.matches("noto serif cjk sc").count(), 1, "{note}");
+        // The unrelated warning must survive untouched.
+        assert!(
+            note.contains("warning: pagebreak was ignored during HTML export"),
+            "{note}"
+        );
+    }
+
+    #[test]
+    fn warnings_note_edge_cases() {
+        assert!(warnings_note(b"").is_none());
+        assert!(warnings_note(b"  \n\t ").is_none());
+
+        // Without blank-line separators the `warning:` prefix still splits blocks.
+        let note =
+            warnings_note(b"warning: unknown font family: a\nwarning: unknown font family: b\n")
+                .unwrap();
+        assert!(note.contains("fallback applied: a, b"), "{note}");
+
+        // An unrecognized block is forwarded as written, never dropped.
+        let note = warnings_note(b"something unexpected from typst\n").unwrap();
+        assert_eq!(
+            note,
+            "[fy-docs] typst reported warnings:\nsomething unexpected from typst"
+        );
+    }
+
+    #[test]
+    fn select_targets_rejects_an_unknown_language() {
+        let temp = std::env::temp_dir().join(format!("fy-docs-select-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&temp);
+        fs::create_dir_all(&temp).unwrap();
+        let mut project = test_project(&temp);
+        let target = |lang: &str| LanguageTarget {
+            lang: lang.to_owned(),
+            display_name: lang.to_owned(),
+            entry: temp.join(format!("{lang}/main.typ")),
+            html_file_name: format!("index_{lang}.html"),
+            pdf_file_name: format!("test_{lang}.pdf"),
+        };
+        project.targets = vec![target("zh-CN"), target("en")];
+
+        let err = select_targets(&project, Some("zz"))
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("`zz`"), "{err}");
+        assert!(err.contains("zh-CN") && err.contains("en"), "{err}");
+
+        // Normalized variants of a real language still resolve.
+        let selected = select_targets(&project, Some("ZH_CN")).unwrap();
+        assert_eq!(selected.len(), 1);
+        assert_eq!(selected[0].lang, "zh-CN");
+
+        let _ = fs::remove_dir_all(temp);
+    }
+
+    #[test]
+    fn clean_stale_outputs_sweeps_retired_and_leaked_files() {
+        let temp = std::env::temp_dir().join(format!("fy-docs-clean-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&temp);
+        fs::create_dir_all(&temp).unwrap();
+        for name in [
+            "_poll.js",
+            "_build",
+            "_temp_zh-CN_4242.html",
+            "index.html",
+            "typst.css",
+        ] {
+            fs::write(temp.join(name), "x").unwrap();
+        }
+
+        clean_stale_outputs(&temp).unwrap();
+
+        assert!(!temp.join("_poll.js").exists(), "retired client must go");
+        assert!(!temp.join("_build").exists(), "retired marker must go");
+        assert!(
+            !temp.join("_temp_zh-CN_4242.html").exists(),
+            "a killed compile's intermediate must go"
+        );
+        // Output the current build owns stays put.
+        assert!(temp.join("index.html").is_file());
+        assert!(temp.join("typst.css").is_file());
+
+        // Sweeping an already clean directory is a no-op.
+        clean_stale_outputs(&temp).unwrap();
+        let _ = fs::remove_dir_all(temp);
+    }
+
+    fn lang_target(lang: &str) -> LanguageTarget {
+        LanguageTarget {
+            lang: lang.to_owned(),
+            display_name: lang.to_owned(),
+            entry: PathBuf::from(format!("docs/{lang}/main.typ")),
+            html_file_name: format!("index_{lang}.html"),
+            pdf_file_name: format!("test_{lang}.pdf"),
+        }
+    }
+
+    #[test]
+    fn landing_page_survives_a_build_with_no_pages() {
+        let temp = std::env::temp_dir().join(format!("fy-docs-landing-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&temp);
+        fs::create_dir_all(temp.join("docs/target")).unwrap();
+        let docs = temp.join("docs");
+        let mut project = test_project(&docs);
+
+        // A pure i18n project: index.html belongs to no single target, so the
+        // routing landing page must be written for it.
+        project.targets = vec![lang_target("en"), lang_target("zh-CN")];
+        ensure_landing_page(&project, &project.target_dir).unwrap();
+        let page = fs::read_to_string(docs.join("target/index.html")).unwrap();
+        assert!(page.contains("index_en.html"), "{page}");
+
+        // An existing landing page is never clobbered.
+        fs::write(docs.join("target/index.html"), "existing").unwrap();
+        ensure_landing_page(&project, &project.target_dir).unwrap();
+        assert_eq!(
+            fs::read_to_string(docs.join("target/index.html")).unwrap(),
+            "existing"
+        );
+
+        // A project with a default target writes index.html itself: nothing to seed.
+        fs::remove_file(docs.join("target/index.html")).unwrap();
+        let mut default_project = test_project(&docs);
+        default_project.targets = vec![LanguageTarget {
+            lang: String::new(),
+            display_name: "Default".to_owned(),
+            entry: docs.join("main.typ"),
+            html_file_name: INDEX_FILE.to_owned(),
+            pdf_file_name: "test.pdf".to_owned(),
+        }];
+        ensure_landing_page(&default_project, &default_project.target_dir).unwrap();
+        assert!(!docs.join("target/index.html").exists());
 
         let _ = fs::remove_dir_all(temp);
     }

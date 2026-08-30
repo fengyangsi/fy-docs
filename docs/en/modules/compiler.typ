@@ -9,7 +9,19 @@ The `compiler` module invokes the `typst` CLI to produce modern HTML output and 
 ]
 
 #contract[
-  HTML compilation leverages `std::thread::scope` to execute parallel multi-language builds. All language targets reside side-by-side in `docs/target/` (`index_zh-CN.html`, `index_en.html`) with shared assets, and a lightweight client-side routing landing page (`index.html`).
+  When `typst` exits successfully, everything it wrote to stderr (unknown font families, directives ignored during HTML export) is forwarded to fy-docs' stderr instead of discarded, so silent font substitution and degraded rendering stay visible. The one exception is the unknown-font-family warning: the fallback chain lists candidates from several operating systems and typst repeats every unavailable family at each style site, so those collapse into one deduplicated line while all other warnings pass through verbatim.
+]
+
+#contract[
+  Every build first sweeps `docs/target/`: artifacts fy-docs no longer writes (the polling-era `_poll.js` client and its `_build` marker) and `_temp_*.html` intermediates left by a killed compile, so an upgraded project never keeps serving retired files.
+]
+
+#contract[
+  When the `--with-pdf` stage fails, the root `index.html` must still exist after the per-language error pages are written: in a pure i18n project `index.html` belongs to no single target, and without it the dev server has no route for `/`.
+]
+
+#contract[
+  HTML compilation leverages `std::thread::scope` to execute parallel multi-language builds. All language targets reside side-by-side in `docs/target/` (`index_en.html`, `index_zh-CN.html`) with shared assets, and a lightweight client-side routing landing page (`index.html`).
 ]
 
 #contract[
