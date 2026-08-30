@@ -7,7 +7,7 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本遵循 [语义化版本 2.0.0](https://semver.org/lang/zh-CN/)。
 
-## [Unreleased]
+## [0.1.8] - 2026-08-31
 
 ### 修复
 - 部分失败的构建不再清空 `typst.css`：错误页仅在文件缺失时写入空样式，成功语言的合并样式得以保留。

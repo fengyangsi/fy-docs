@@ -4,9 +4,9 @@
 #show: project_book.with(
   title: "fy-docs 规格说明书",
   subtitle: "多语言 Typst 规格文档编译器与实时阅读器",
-  version: "0.1.7",
+  version: "0.1.8",
   author: "fengyangsi",
-  date: "2026-08-30",
+  date: "2026-08-31",
   lang: "zh-CN",
   methodology: "541 演进式契约驱动开发",
 )
