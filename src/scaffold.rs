@@ -7,22 +7,23 @@ use std::fs;
 use std::path::Path;
 
 /// The fy-spec template library, embedded at compile time.
-const TEMPLATE_LIB: &str = include_str!("../fy-spec/lib.typ");
+const TEMPLATE_LIB: &str = include_str!("../docs/fy-spec/lib.typ");
 
 /// Starter `main.typ` with `{{NAME}}` and `{{VERSION}}` placeholders.
 const STARTER_MAIN: &str = r#"#import "fy-spec/lib.typ": *
 
 #show: project_book.with(
-  title: "{{NAME}} 规格说明书",
-  subtitle: "项目规格文档",
+  title: "{{NAME}} Specification",
+  subtitle: none,
   version: "{{VERSION}}",
   author: "{{AUTHOR}}",
   date: datetime.today().display("[year]-[month]-[day]"),
+  lang: "en", // change to "zh" or "zh-CN" for Chinese documents
 )
 
-= 概述
+= Overview
 
-本文档由 `cargo fy-docs init` 生成。请在 `docs/modules/` 目录中添加模块文档，并在此处 `#include` 引入。
+This document was initialized by `cargo fy-docs init`. Add your module specifications in `docs/modules/` and `#include` them here.
 
 // #include "modules/example.typ"
 "#;

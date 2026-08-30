@@ -7,6 +7,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.6] - 2026-08-30
+
+### Added
+- **Multilingual (i18n) Support**: Automatically detect single-language and multi-language specification folders (`docs/<lang>/main.typ` like `docs/zh-CN/`, `docs/en/`).
+- **Interactive Language Switcher**: Added top toolbar `🌐 Language Switcher` dropdown with smooth in-page navigation between `index_<lang>.html` pages.
+- **CLI Commands Reorganized**:
+  - `cargo fy-docs` (and `cargo fy-docs build`): Idempotent, non-blocking full build for HTML and PDF 2.0 (CI-safe).
+  - `cargo fy-docs html`: Compile offline HTML documentation only.
+  - `cargo fy-docs dev`: Interactive development server with live reload and browser auto-opening.
+  - Added `--lang <LANG>` parameter to target specific language documentation.
+- **Multilingual Dogfood Specifications**: Full bilingual specification books (English and Simplified Chinese) with interactive architecture DAG diagrams (powered by Fletcher).
+- **CI Chinese Fonts**: Added Google Noto CJK fonts installation in GitHub Actions workflows to guarantee zero `.notdef` box artifacts on headless Linux runners.
+
+### Changed
+- **Template Decoupling**: Fully decoupled `fy-spec` template fonts with safe fallback across Linux, macOS, and Windows. Fonts can be overridden via `fonts` parameter.
+- **Dynamic Cover Metadata**: Generic `title`, `lang`, `region` defaults without hardcoded ecosystem assumptions; `author`, `subtitle`, and `methodology` render dynamically only when provided.
+
+### Removed
+- Removed redundant `fy-docs/fy-spec` root directory, embedding directly from `docs/fy-spec/lib.typ`.
+
 ## [0.1.5] - 2026-08-30
 
 ### Added

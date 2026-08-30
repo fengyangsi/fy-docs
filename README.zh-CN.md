@@ -36,25 +36,28 @@ cargo-fy-docs --version
 # 初始化 docs/ 目录：自动生成 main.typ 入口、内嵌 fy-spec 模板库与 modules/ 目录。
 cargo fy-docs init
 
-# 交互预览：构建 HTML、打开浏览器并监听 .typ 文件。
+# 全量构建：编译全部语言 HTML 阅读页与 PDF 2.0 规格说明书（默认命令，CI 安全幂等退出）。
 cargo fy-docs
-
-# 只构建离线 HTML 阅读页。
+# 或显式执行：
 cargo fy-docs build
 
-# 同时构建 HTML 阅读页与打印版 PDF。
-cargo fy-docs build --with-pdf
+# 仅构建离线 HTML 网页包。
+cargo fy-docs html
 
-# 只构建打印版 PDF。
+# 仅导出版本化 PDF 2.0 规格说明书。
 cargo fy-docs pdf
+
+# 交互开发工作台：启动本地 Web 服务，自动打开浏览器并监听源码热重载。
+cargo fy-docs dev
 ```
 
 常用参数：
 
 ```powershell
-cargo fy-docs --root D:\Code\fy
-cargo fy-docs --port 8181
-cargo fy-docs --no-open
+cargo fy-docs --lang zh-CN    # 定向编译特定语言版本
+cargo fy-docs --open          # 构建完成后在浏览器中打开页面
+cargo fy-docs --root D:\Code  # 显式指定 Typst 编译沙盒根目录
+cargo fy-docs dev --port 8181 # 自定义开发服务器端口
 ```
 
 ## 输出位置

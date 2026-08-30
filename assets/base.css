@@ -269,7 +269,7 @@ body {
   color: var(--links);
 }
 
-.fy-theme-wrap, .fy-search-wrap { position: relative; }
+.fy-theme-wrap, .fy-search-wrap, .fy-lang-wrap { position: relative; }
 
 .fy-theme-menu {
   position: absolute;
@@ -283,7 +283,7 @@ body {
   border-radius: 10px;
   box-shadow: 0 12px 32px rgb(0 0 0 / 18%);
 }
-.fy-theme-menu button {
+.fy-theme-menu button, .fy-theme-menu a {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -297,16 +297,18 @@ body {
   font: inherit;
   font-size: 0.85rem;
   text-align: left;
+  text-decoration: none;
   cursor: pointer;
 }
-.fy-theme-menu button:hover {
+.fy-theme-menu button:hover, .fy-theme-menu a:hover {
   background: color-mix(in srgb, var(--ink) 8%, var(--bg));
+  color: var(--links);
 }
-.fy-theme-menu button[aria-checked="true"] {
+.fy-theme-menu button[aria-checked="true"], .fy-theme-menu a[aria-checked="true"] {
   color: var(--sidebar-active);
   font-weight: 700;
 }
-.fy-theme-menu button[aria-checked="true"]::after { content: "✓"; }
+.fy-theme-menu button[aria-checked="true"]::after, .fy-theme-menu a[aria-checked="true"]::after { content: "✓"; }
 
 .fy-search-panel {
   position: absolute;

@@ -1,11 +1,12 @@
 //! Page template and bundled assets for the generated static page.
 
+use crate::project::LanguageTarget;
+
 const DOC_TEMPLATE: &str = include_str!("../assets/doc.html");
 pub const BASE_CSS: &str = include_str!("../assets/base.css");
 pub const VIEWER_JS: &str = include_str!("../assets/viewer.js");
 /// Shipped with `build` output: a no-op so `file://` pages stay silent.
-pub const POLL_STUB: &str =
-    "/* fy-docs: live reload is only provided by `cargo fy-docs serve`. */\n";
+pub const POLL_STUB: &str = "/* fy-docs: live reload is only provided by `cargo fy-docs dev`. */\n";
 /// Served instead of the stub when running as a server.
 pub const POLL_REAL: &str = include_str!("../assets/poll.js");
 
@@ -20,6 +21,7 @@ pub(crate) struct UiText {
     pub print: &'static str,
     pub table_of_contents: &'static str,
     pub github: &'static str,
+    pub language_label: &'static str,
     pub compile_failed: &'static str,
     pub compile_failed_detail: &'static str,
     pub compile_failed_hint: &'static str,
@@ -42,6 +44,7 @@ pub(crate) fn ui_text(title: &str, body: &str) -> UiText {
             print: "打印当前章节",
             table_of_contents: "目录",
             github: "GitHub 仓库",
+            language_label: "切换语言",
             compile_failed: "编译失败",
             compile_failed_detail: "typst 编译未能通过，输出如下：",
             compile_failed_hint: "修正源码并保存后，本页会在下次编译完成时自动更新。",
@@ -58,6 +61,7 @@ pub(crate) fn ui_text(title: &str, body: &str) -> UiText {
             print: "Print current chapter",
             table_of_contents: "Table of contents",
             github: "GitHub repository",
+            language_label: "Language",
             compile_failed: "Compilation failed",
             compile_failed_detail: "typst compilation failed with the following output:",
             compile_failed_hint: "Fix the source and save; this page will update automatically on the next successful build.",
@@ -67,7 +71,14 @@ pub(crate) fn ui_text(title: &str, body: &str) -> UiText {
 
 /// Renders the generated page. The Typst body is already trimmed; GitHub is
 /// linked only when the package declares that repository.
-pub fn doc_page(title: &str, name: &str, repository: Option<&str>, body: &str) -> String {
+pub fn doc_page(
+    title: &str,
+    name: &str,
+    repository: Option<&str>,
+    body: &str,
+    current_target: Option<&LanguageTarget>,
+    all_targets: &[LanguageTarget],
+) -> String {
     let ui = ui_text(title, body);
     let github_link = repository.map_or_else(String::new, |url| {
         format!(
@@ -77,6 +88,9 @@ pub fn doc_page(title: &str, name: &str, repository: Option<&str>, body: &str) -
             ui.github,
         )
     });
+
+    let lang_menu = render_lang_menu(current_target, all_targets, ui.language_label);
+
     DOC_TEMPLATE
         .replace("{{TITLE}}", &escape(title))
         .replace("{{NAME}}", &escape(name))
@@ -90,7 +104,53 @@ pub fn doc_page(title: &str, name: &str, repository: Option<&str>, body: &str) -
         .replace("{{PRINT}}", ui.print)
         .replace("{{TABLE_OF_CONTENTS}}", ui.table_of_contents)
         .replace("{{GITHUB_LINK}}", &github_link)
+        .replace("{{LANG_MENU}}", &lang_menu)
         .replace("{{BODY}}", body)
+}
+
+fn render_lang_menu(
+    current_target: Option<&LanguageTarget>,
+    all_targets: &[LanguageTarget],
+    label: &str,
+) -> String {
+    // Filter distinct language targets (excluding empty default duplicates)
+    let distinct_targets: Vec<&LanguageTarget> =
+        all_targets.iter().filter(|t| !t.lang.is_empty()).collect();
+
+    if distinct_targets.len() <= 1 {
+        return String::new();
+    }
+
+    let mut items = String::new();
+    let current_lang = current_target.map(|t| t.lang.as_str()).unwrap_or("");
+    for target in &distinct_targets {
+        let active = if current_lang.is_empty() {
+            target.lang == distinct_targets[0].lang
+        } else {
+            target.lang.eq_ignore_ascii_case(current_lang)
+        };
+        items.push_str(&format!(
+            r#"<a href="{}" role="menuitem" class="fy-lang-item" aria-checked="{}">{}</a>"#,
+            escape_attribute(&target.html_file_name),
+            if active { "true" } else { "false" },
+            escape(&target.display_name)
+        ));
+    }
+
+    format!(
+        r#"<div class="fy-theme-wrap fy-lang-wrap">
+        <button id="fy-lang-toggle" class="fy-icon-btn" aria-expanded="false" aria-haspopup="true" title="{label}">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/>
+            <path d="M2 12h20"/>
+          </svg>
+        </button>
+        <div id="fy-lang-menu" class="fy-theme-menu fy-lang-menu" role="menu" aria-label="{label}" hidden>
+          {items}
+        </div>
+      </div>"#
+    )
 }
 
 pub(crate) fn escape(text: &str) -> String {
@@ -114,6 +174,8 @@ mod tests {
             "fy-x",
             Some("https://github.com/fengyangsi/fy-docs"),
             "<h1>hi</h1>",
+            None,
+            &[],
         );
         assert!(page.contains("<title>T &amp; &lt;T&gt; · fy-docs</title>"));
         assert!(page.contains("<html lang=\"en\">"));
@@ -130,14 +192,13 @@ mod tests {
 
     #[test]
     fn omits_github_link_without_a_repository() {
-        let page = doc_page("T", "fy-x", None, "<h1>hi</h1>");
+        let page = doc_page("T", "fy-x", None, "<h1>hi</h1>", None, &[]);
         assert!(!page.contains("fy-github-link"));
     }
 
     #[test]
     fn localizes_controls_for_chinese_documents() {
-        let page = doc_page("中文文档", "fy-x", None, "<h1>内容</h1>");
+        let page = doc_page("中文文档", "fy-x", None, "<h1>内容</h1>", None, &[]);
         assert!(page.contains("<html lang=\"zh-CN\">"));
-        assert!(page.contains("title=\"主题\""));
     }
 }

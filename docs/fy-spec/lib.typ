@@ -1,12 +1,35 @@
 // Shared specification document system for the fy ecosystem.
 //
+// Language-agnostic & font-decoupled design system for technical specifications.
 // The PDF output ships a single print palette (light); HTML theming lives in
 // the fy-docs viewer stylesheet, not here.
 
-#let fonts = (
-  serif: ("Noto Serif SC", "SimSun", "Times New Roman"),
-  sans: ("Noto Sans SC", "Microsoft YaHei", "Arial"),
-  mono: ("Source Code Pro", "Cascadia Code", "DejaVu Sans Mono", "Consolas", "Courier New"),
+#let default-fonts = (
+  serif: (
+    "Noto Serif SC",
+    "Noto Serif CJK SC",
+    "Source Han Serif SC",
+    "Songti SC",
+    "SimSun",
+    "Times New Roman",
+    "Linux Libertine",
+  ),
+  sans: (
+    "Noto Sans SC",
+    "Noto Sans CJK SC",
+    "Source Han Sans SC",
+    "PingFang SC",
+    "Microsoft YaHei",
+    "Arial",
+    "Helvetica",
+  ),
+  mono: (
+    "Source Code Pro",
+    "Cascadia Code",
+    "DejaVu Sans Mono",
+    "Consolas",
+    "Courier New",
+  ),
 )
 
 #let palette = (
@@ -48,16 +71,11 @@
   code-bg: palette.code-bg,
   inline-code-bg: palette.inline-bg,
 )
-#let font-serif = fonts.serif
-#let font-sans = fonts.sans
-#let font-mono = fonts.mono
+#let font-serif = default-fonts.serif
+#let font-sans = default-fonts.sans
+#let font-mono = default-fonts.mono
 
 /// Horizontally centered content that survives HTML export.
-///
-/// Typst's HTML backend currently *drops the whole content* wrapped in an
-/// `align(..)` container (it only emits an "align was ignored" warning), so
-/// native alignment must stay on the PDF path while HTML emits an equivalent
-/// CSS rule. See https://github.com/typst/typst/issues/5512.
 #let centered(body) = context {
   if target() == "html" {
     html.div(style: "text-align: center", body)
@@ -66,17 +84,55 @@
   }
 }
 
-/// Renders an ISO B5 specification book for an fy project.
+/// Renders an ISO B5 specification book for a project.
 #let project_book(
-  title: "fy 规格说明书",
-  subtitle: "契约驱动的软件规格与设计",
+  title: "Project Specification",
+  subtitle: none,
   version: "0.1.0",
-  author: "fengyangsi",
+  author: none,
   date: datetime.today().display("[year]-[month]-[day]"),
-  methodology: "541 演进式契约驱动开发",
+  lang: "en",
+  region: none,
+  fonts: (:),
+  methodology: none,
   body,
 ) = {
-  set document(title: title, author: author)
+  let (parsed-lang, parsed-region) = if lang.contains("-") {
+    let parts = lang.split("-")
+    (parts.at(0), if region == none { parts.at(1) } else { region })
+  } else {
+    (lang, region)
+  }
+
+  let is-zh = parsed-lang == "zh"
+
+  let active-fonts = (
+    serif: if "serif" in fonts { fonts.serif } else { default-fonts.serif },
+    sans: if "sans" in fonts { fonts.sans } else { default-fonts.sans },
+    mono: if "mono" in fonts { fonts.mono } else { default-fonts.mono },
+  )
+
+  let labels = if is-zh {
+    (
+      edition: "规格说明书 · ISO B5 典藏版",
+      version: "版本 (Version):",
+      author: "作者 (Author):",
+      date: "构建日期 (Date):",
+      methodology: "核心范式 (Methodology):",
+      toc: "目 录",
+    )
+  } else {
+    (
+      edition: "PROJECT SPECIFICATION · ISO B5 EDITION",
+      version: "Version:",
+      author: "Author:",
+      date: "Date:",
+      methodology: "Methodology:",
+      toc: "Table of Contents",
+    )
+  }
+
+  set document(title: title, author: if author != none { author } else { () })
 
   set page(
     paper: "iso-b5",
@@ -98,9 +154,9 @@
         }
 
         if calc.even(page-number) {
-          text(size: 8.5pt, fill: palette.muted, font: fonts.sans)[#title · #version]
+          text(size: 8.5pt, fill: palette.muted, font: active-fonts.sans)[#title · #version]
         } else {
-          align(right, text(size: 8.5pt, fill: palette.muted, font: fonts.sans, current-title))
+          align(right, text(size: 8.5pt, fill: palette.muted, font: active-fonts.sans, current-title))
         }
         v(1pt)
         line(length: 100%, stroke: 0.5pt + palette.border)
@@ -113,7 +169,7 @@
           size: 9pt,
           weight: "medium",
           fill: palette.ink,
-          font: fonts.mono,
+          font: active-fonts.mono,
           str(page-number),
         )
         if calc.even(page-number) {
@@ -126,16 +182,16 @@
   )
 
   set text(
-    font: fonts.serif,
+    font: active-fonts.serif,
     size: 10pt,
     fill: palette.ink,
-    lang: "zh",
-    region: "cn",
+    lang: parsed-lang,
+    region: parsed-region,
   )
   set par(leading: 0.75em, justify: true, first-line-indent: 0em)
 
   set raw(theme: palette.syntax)
-  show raw: set text(font: fonts.mono, size: 8.5pt, fill: palette.code-fg)
+  show raw: set text(font: active-fonts.mono, size: 8.5pt, fill: palette.code-fg)
   show raw.where(block: true): content => block(
     width: 100%,
     fill: palette.code-bg,
@@ -156,7 +212,7 @@
   show heading: content => block(
     above: 1.2em,
     below: 0.6em,
-    text(font: fonts.sans, fill: palette.heading, weight: "bold", content),
+    text(font: active-fonts.sans, fill: palette.heading, weight: "bold", content),
   )
   show heading.where(level: 1): content => {
     pagebreak(weak: true)
@@ -165,7 +221,7 @@
       width: 100%,
       stroke: (bottom: 1.5pt + palette.accent),
       inset: (bottom: 8pt),
-      text(size: 16pt, fill: palette.h1-fill, font: fonts.sans, content),
+      text(size: 16pt, fill: palette.h1-fill, font: active-fonts.sans, content),
     )
     v(6pt)
   }
@@ -180,6 +236,22 @@
     content,
   )
 
+  // Assemble metadata grid items dynamically
+  let meta-grid-items = (
+    text(weight: "bold", fill: palette.meta-label, font: active-fonts.sans)[#labels.version],
+    text(font: active-fonts.mono, fill: palette.meta-value)[#version],
+  )
+  if author != none {
+    meta-grid-items.push(text(weight: "bold", fill: palette.meta-label, font: active-fonts.sans)[#labels.author])
+    meta-grid-items.push(text(fill: palette.meta-value)[#author])
+  }
+  meta-grid-items.push(text(weight: "bold", fill: palette.meta-label, font: active-fonts.sans)[#labels.date])
+  meta-grid-items.push(text(font: active-fonts.mono, fill: palette.meta-value)[#date])
+  if methodology != none {
+    meta-grid-items.push(text(weight: "bold", fill: palette.meta-label, font: active-fonts.sans)[#labels.methodology])
+    meta-grid-items.push(text(fill: palette.meta-value)[#methodology])
+  }
+
   let cover = [
     #v(-20pt)
     #rect(
@@ -187,61 +259,59 @@
       radius: 6pt,
       inset: (x: 16pt, y: 6pt),
     )[
-      #text(size: 9pt, weight: "bold", fill: palette.chip-fg, font: fonts.mono)[
-        PROJECT SPECIFICATION · ISO B5 EDITION
+      #text(size: 9pt, weight: "bold", fill: palette.chip-fg, font: active-fonts.mono)[
+        #labels.edition
       ]
     ]
 
     #v(20pt)
-    #text(size: 26pt, weight: "bold", fill: palette.title-fill, font: fonts.sans)[#title]
-    #v(8pt)
-    #text(size: 13pt, fill: palette.muted, font: fonts.serif)[#subtitle]
+    #text(size: 26pt, weight: "bold", fill: palette.title-fill, font: active-fonts.sans)[#title]
+    #if subtitle != none [
+      #v(8pt)
+      #text(size: 13pt, fill: palette.muted, font: active-fonts.serif)[#subtitle]
+    ]
     #v(16pt)
     #line(length: 40%, stroke: 1.5pt + palette.accent)
-    #v(40pt)
+    #v(32pt)
     #grid(
       columns: (auto, auto),
       gutter: 14pt,
       align: left,
-      text(weight: "bold", fill: palette.meta-label, font: fonts.sans)[版本 (Version):],
-      text(font: fonts.mono, fill: palette.meta-value)[#version],
-      text(weight: "bold", fill: palette.meta-label, font: fonts.sans)[架构师 (Author):],
-      text(fill: palette.meta-value)[#author],
-      text(weight: "bold", fill: palette.meta-label, font: fonts.sans)[构建日期 (Date):],
-      text(font: fonts.mono, fill: palette.meta-value)[#date],
-      text(weight: "bold", fill: palette.meta-label, font: fonts.sans)[核心范式 (Methodology):],
-      text(fill: palette.meta-value)[#methodology],
+      ..meta-grid-items
     )
   ]
-  // `rect`, `line`, and `grid` are dropped *with their contents* by the HTML
-  // backend, so the cover needs a dedicated structural branch instead of
-  // reusing `cover` with a CSS wrapper.
+
   context {
     if target() == "html" {
       html.div(class: "fy-cover", style: "text-align: center")[
         #html.span(class: "fy-cover-chip")[
-          #text(size: 9pt, weight: "bold", font: fonts.mono)[
-            PROJECT SPECIFICATION · ISO B5 EDITION
+          #text(size: 9pt, weight: "bold", font: active-fonts.mono)[
+            #labels.edition
           ]
         ]
         #parbreak()
-        #text(size: 26pt, weight: "bold", fill: palette.title-fill, font: fonts.sans)[#title]
-        #parbreak()
-        #text(size: 13pt, fill: palette.muted, font: fonts.serif)[#subtitle]
+        #text(size: 26pt, weight: "bold", fill: palette.title-fill, font: active-fonts.sans)[#title]
+        #if subtitle != none [
+          #parbreak()
+          #text(size: 13pt, fill: palette.muted, font: active-fonts.serif)[#subtitle]
+        ]
         #parbreak()
         #html.elem("dl", attrs: (class: "fy-cover-meta"))[
-          #html.elem("dt")[版本 (Version):]
-          #html.elem("dd")[#text(font: fonts.mono)[#version]]
-          #html.elem("dt")[架构师 (Author):]
-          #html.elem("dd")[#author]
-          #html.elem("dt")[构建日期 (Date):]
-          #html.elem("dd")[#text(font: fonts.mono)[#date]]
-          #html.elem("dt")[核心范式 (Methodology):]
-          #html.elem("dd")[#methodology]
+          #html.elem("dt")[#labels.version]
+          #html.elem("dd")[#text(font: active-fonts.mono)[#version]]
+          #if author != none [
+            #html.elem("dt")[#labels.author]
+            #html.elem("dd")[#author]
+          ]
+          #html.elem("dt")[#labels.date]
+          #html.elem("dd")[#text(font: active-fonts.mono)[#date]]
+          #if methodology != none [
+            #html.elem("dt")[#labels.methodology]
+            #html.elem("dd")[#methodology]
+          ]
         ]
       ]
     } else {
-      // Vertical centering only exists in paged layout.
       align(center + horizon, cover)
     }
   }
@@ -249,7 +319,7 @@
 
   v(10pt)
   centered[
-    #text(size: 16pt, weight: "bold", fill: palette.title-fill, font: fonts.sans)[目 录]
+    #text(size: 16pt, weight: "bold", fill: palette.title-fill, font: active-fonts.sans)[#labels.toc]
   ]
   v(12pt)
   outline(title: none, depth: 3, indent: 1.5em)
@@ -258,12 +328,10 @@
   body
 }
 
-/// Base component for semantic callouts. `kind` feeds the `fy-box fy-<kind>`
-/// classes emitted under HTML export, so the viewer stylesheet can target a
-/// box family without scraping typst's own structure.
+/// Base component for semantic callouts.
 #let callout(
   body,
-  title: "提示",
+  title: "Note",
   icon: none,
   kind: "note",
   accent: palette.note.accent,
@@ -294,9 +362,9 @@
   }
 }
 
-#let contract(body) = callout(
+#let contract(body, title: "强类型接口与规格契约 (Contract)") = callout(
   body,
-  title: "强类型接口与规格契约 (Contract)",
+  title: title,
   icon: "▣",
   kind: "contract",
   accent: palette.contract.accent,
@@ -304,9 +372,9 @@
   border: palette.contract.border,
 )
 
-#let invariant(body) = callout(
+#let invariant(body, title: "核心不变性与安全约束 (Invariant)") = callout(
   body,
-  title: "核心不变性与安全约束 (Invariant)",
+  title: title,
   icon: "◆",
   kind: "invariant",
   accent: palette.invariant.accent,
@@ -314,51 +382,51 @@
   border: palette.invariant.border,
 )
 
-#let logic-box(body) = callout(
+#let logic-box(body, title: "形式逻辑与推理规则 (Logical Rules)") = callout(
   body,
-  title: "形式逻辑与推理规则 (Logical Rules)",
+  title: title,
   icon: "◇",
   kind: "logic",
 )
 
-#let proof-box(body) = callout(
+#let proof-box(body, title: "证明策略与启发式搜索 (Proof Strategy)") = callout(
   body,
-  title: "证明策略与启发式搜索 (Proof Strategy)",
+  title: title,
   icon: "◇",
   kind: "proof",
 )
 
-#let math-box(body) = callout(
+#let math-box(body, title: "数学推导与数值模型 (Mathematical Model)") = callout(
   body,
-  title: "数学推导与数值模型 (Mathematical Model)",
+  title: title,
   icon: "◇",
   kind: "math",
 )
 
-#let geom-box(body) = callout(
+#let geom-box(body, title: "几何结构与空间模型 (Geometry Model)") = callout(
   body,
-  title: "几何结构与空间模型 (Geometry Model)",
+  title: title,
   icon: "◇",
   kind: "geom",
 )
 
-#let axiom-box(body) = callout(
+#let axiom-box(body, title: "几何公理与推演法则 (Geometric Axiom)") = callout(
   body,
-  title: "几何公理与推演法则 (Geometric Axiom)",
+  title: title,
   icon: "◇",
   kind: "axiom",
 )
 
-#let motion-box(body) = callout(
+#let motion-box(body, title: "运动学模型与时序法则 (Motion Model)") = callout(
   body,
-  title: "运动学模型与时序法则 (Motion Model)",
+  title: title,
   icon: "◇",
   kind: "motion",
 )
 
-#let example-box(body) = callout(
+#let example-box(body, title: "规格用例与状态验证 (Example & Verification)") = callout(
   body,
-  title: "规格用例与状态验证 (Example & Verification)",
+  title: title,
   icon: "●",
   kind: "example",
   accent: palette.example.accent,
@@ -367,7 +435,7 @@
 )
 
 #let status-badge(status: "待确立", phase: "阶段 1") = {
-  let pending = status.contains("待")
+  let pending = status.contains("待") or status.contains("pending") or status.contains("WIP")
   let state = if pending { "pending" } else { "done" }
   let marker = if pending { "○" } else { "✓" }
 
@@ -385,7 +453,7 @@
         radius: 3pt,
         baseline: 0%,
       )[
-        #text(size: 8pt, weight: "bold", fill: badge.fg, font: fonts.mono)[
+        #text(size: 8pt, weight: "bold", fill: badge.fg, font: default-fonts.mono)[
           #marker 状态: #status | 阶段: #phase
         ]
       ]

@@ -20,7 +20,7 @@ pub fn spawn(state: Arc<AppState>) -> Result<()> {
         // Hold the watcher: dropping it unregisters the watch.
         let _watcher = watcher;
         while wait_for_source_change(&rx) {
-            compiler::generate_into(&state, false);
+            compiler::generate_into(&state, false, None);
             state.bump_build();
             crate::state::log(&format!(
                 "[fy-docs] build #{} finished",
@@ -85,6 +85,7 @@ mod tests {
             version: "0.1.0".to_owned(),
             repository: None,
             entry: docs.join("main.typ"),
+            targets: Vec::new(),
             docs_dir: docs.clone(),
             root: temp.clone(),
             target_dir: docs.join("target"),

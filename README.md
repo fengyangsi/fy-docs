@@ -36,25 +36,28 @@ cargo-fy-docs --version
 # Scaffold a docs/ directory with a starter main.typ, embedded fy-spec template, and modules/ folder.
 cargo fy-docs init
 
-# Interactive preview: build HTML, open the browser, and watch .typ files.
+# Full build: compile all language HTML pages and PDF 2.0 specifications (default command, CI-safe).
 cargo fy-docs
-
-# Build the offline HTML reading page only.
+# or explicitly:
 cargo fy-docs build
 
-# Build the HTML page and a print-edition PDF together.
-cargo fy-docs build --with-pdf
+# Build offline HTML documentation only.
+cargo fy-docs html
 
-# Build only the print-edition PDF.
+# Build versioned PDF 2.0 specification(s) only.
 cargo fy-docs pdf
+
+# Interactive development: start local dev server with live reload and browser preview.
+cargo fy-docs dev
 ```
 
 Common options:
 
 ```powershell
-cargo fy-docs --root D:\Code\fy
-cargo fy-docs --port 8181
-cargo fy-docs --no-open
+cargo fy-docs --lang zh-CN    # Target a specific language
+cargo fy-docs --open          # Open in browser after build
+cargo fy-docs --root D:\Code  # Explicitly specify Typst root
+cargo fy-docs dev --port 8181 # Customize dev server port
 ```
 
 ## Output

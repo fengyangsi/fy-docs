@@ -83,6 +83,24 @@
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', paintTheme);
   paintTheme();
 
+  /* ---------- language menu ---------- */
+  var langToggle = $('fy-lang-toggle');
+  var langMenu = $('fy-lang-menu');
+
+  if (langToggle && langMenu) {
+    function setLangMenu(open) {
+      langMenu.hidden = !open;
+      langToggle.setAttribute('aria-expanded', String(open));
+    }
+    langToggle.addEventListener('click', function (event) {
+      event.stopPropagation();
+      setLangMenu(langMenu.hidden);
+    });
+    document.addEventListener('click', function (event) {
+      if (!langMenu.hidden && !langMenu.contains(event.target)) setLangMenu(false);
+    });
+  }
+
   /* ---------- collapsible sidebar ---------- */
 
   var columns = document.querySelector('.fy-columns');

@@ -68,6 +68,11 @@ jobs:
       - name: Setup Typst
         uses: typst-community/setup-typst@v3
 
+      - name: Install Chinese Fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends fonts-noto-cjk fonts-noto-cjk-extra
+
       - name: Build Specification PDF with fy-docs
         run: cargo run -- pdf
 

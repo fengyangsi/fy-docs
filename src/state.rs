@@ -89,6 +89,7 @@ mod tests {
             version: "0.1.0".to_owned(),
             repository: None,
             entry: temp.join("main.typ"),
+            targets: Vec::new(),
             docs_dir: temp.clone(),
             root: temp.clone(),
             target_dir: temp.clone(),

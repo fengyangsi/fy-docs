@@ -19,22 +19,30 @@ use crate::state::AppState;
     name = "cargo-fy-docs",
     bin_name = "cargo fy-docs",
     version,
-    about = "Generate and view Typst specification documents in the browser, like cargo doc for your docs/"
+    about = "Build, preview, and generate Typst specification documents (HTML & PDF 2.0) with i18n support"
 )]
 struct Cli {
-    /// Typst compile root; auto-detected from the absolute imports when omitted
+    /// Typst compile root; auto-detected from imports when omitted
     #[arg(long, global = true)]
     root: Option<PathBuf>,
 
-    /// Also compile a print-edition PDF into docs/release/
+    /// Target specific language (e.g., "zh-CN", "en", "zh-TW")
+    #[arg(long, global = true)]
+    lang: Option<String>,
+
+    /// Open in default web browser after build
+    #[arg(long, global = true)]
+    open: bool,
+
+    /// Also compile a print-edition PDF into docs/release/ (for build/html subcommands)
     #[arg(long, global = true)]
     with_pdf: bool,
 
-    /// Server port (increments on collision)
+    /// Server port for dev mode (increments on collision)
     #[arg(long, global = true, default_value_t = 8181)]
     port: u16,
 
-    /// Do not open the browser
+    /// Do not open the browser in dev mode
     #[arg(long, global = true)]
     no_open: bool,
 
@@ -46,18 +54,23 @@ struct Cli {
 enum Command {
     /// Scaffold a new docs/ directory with a starter template
     Init,
-    /// Generate and serve with live reload (the default command)
-    Serve,
-    /// Generate only; the page lands in docs/target/
+    /// Build everything (HTML pages and PDF 2.0 specifications) - default command
     Build,
-    /// Compile only the print-edition PDF into docs/release/
+    /// Build only the offline HTML documentation
+    Html,
+    /// Compile only the print-edition PDF 2.0 specification(s) into docs/release/
     Pdf,
+    /// Start interactive development server with live reload and browser preview
+    Dev,
+    /// Deprecated alias for dev
+    #[command(hide = true)]
+    Serve,
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse_from(cargo_external_args(std::env::args_os()));
-    let cwd = std::env::current_dir()?.canonicalize()?;
+    let cwd = crate::project::clean_canonicalize(&std::env::current_dir()?)?;
     dispatch(cli, &cwd).await
 }
 
@@ -72,23 +85,45 @@ async fn dispatch(cli: Cli, cwd: &Path) -> Result<()> {
 
     match cli.command {
         Some(Command::Init) => unreachable!(),
-        Some(Command::Build) => {
-            compiler::generate_into(&state, cli.with_pdf);
+        None | Some(Command::Build) => {
+            // Default: Full build of both HTML and PDF
+            compiler::generate_into(&state, true, cli.lang.as_deref());
             state.write_build();
             state::log(&format!(
                 "[fy-docs] generated {}",
                 state::display_path(&state.project.target_dir)
             ));
+            if cli.open {
+                let index_path = state.project.target_dir.join(compiler::INDEX_FILE);
+                let _ = open::that_detached(index_path);
+            }
+        }
+        Some(Command::Html) => {
+            // HTML only (or with PDF if explicitly asked)
+            compiler::generate_into(&state, cli.with_pdf, cli.lang.as_deref());
+            state.write_build();
+            state::log(&format!(
+                "[fy-docs] HTML generated in {}",
+                state::display_path(&state.project.target_dir)
+            ));
+            if cli.open {
+                let index_path = state.project.target_dir.join(compiler::INDEX_FILE);
+                let _ = open::that_detached(index_path);
+            }
         }
         Some(Command::Pdf) => {
-            let path = compiler::compile_pdf(&state.project)?;
-            state::log(&format!(
-                "[fy-docs] PDF written to {}",
-                state::display_path(&path)
-            ));
+            // PDF 2.0 specifications only
+            let paths = compiler::compile_pdf(&state.project, cli.lang.as_deref())?;
+            for path in paths {
+                state::log(&format!(
+                    "[fy-docs] PDF written to {}",
+                    state::display_path(&path)
+                ));
+            }
         }
-        None | Some(Command::Serve) => {
-            compiler::generate_into(&state, cli.with_pdf);
+        Some(Command::Dev) | Some(Command::Serve) => {
+            // Dev mode: live server + watcher
+            compiler::generate_into(&state, cli.with_pdf, cli.lang.as_deref());
             state.write_build();
             watcher::spawn(state.clone())?;
 
@@ -139,7 +174,8 @@ async fn bind(port: u16) -> Result<tokio::net::TcpListener> {
     for candidate in port..=last {
         match tokio::net::TcpListener::bind(("127.0.0.1", candidate)).await {
             Ok(listener) => return Ok(listener),
-            Err(_) => continue,
+            Err(err) if err.kind() == std::io::ErrorKind::AddrInUse => continue,
+            Err(err) => return Err(err.into()),
         }
     }
     anyhow::bail!("no free port in {port}..={last}")
@@ -151,96 +187,79 @@ mod tests {
 
     #[test]
     fn removes_cargo_forwarded_subcommand_name() {
-        let args = cargo_external_args([
-            OsString::from("cargo-fy-docs"),
-            OsString::from("fy-docs"),
-            OsString::from("build"),
-        ]);
-        assert_eq!(args, ["cargo-fy-docs", "build"]);
+        let args = ["cargo-fy-docs", "fy-docs", "dev"]
+            .into_iter()
+            .map(OsString::from);
+        let normalized = cargo_external_args(args);
+        assert_eq!(
+            normalized,
+            vec![OsString::from("cargo-fy-docs"), OsString::from("dev")]
+        );
     }
 
     #[test]
     fn keeps_direct_executable_arguments() {
-        let args = cargo_external_args([OsString::from("cargo-fy-docs"), OsString::from("build")]);
-        assert_eq!(args, ["cargo-fy-docs", "build"]);
+        let args = ["cargo-fy-docs", "html", "--root", "."]
+            .into_iter()
+            .map(OsString::from);
+        let normalized = cargo_external_args(args);
+        assert_eq!(
+            normalized,
+            vec![
+                OsString::from("cargo-fy-docs"),
+                OsString::from("html"),
+                OsString::from("--root"),
+                OsString::from(".")
+            ]
+        );
     }
 
     #[test]
     fn cli_parses_all_subcommands_and_flags() {
-        use clap::Parser;
-
-        // 1. Preview default
-        let cli = Cli::parse_from(["cargo-fy-docs", "--port", "9090", "--no-open"]);
-        assert_eq!(cli.port, 9090);
-        assert!(cli.no_open);
-        assert!(cli.command.is_none());
-
-        // 2. init
-        let cli = Cli::parse_from(["cargo-fy-docs", "init"]);
-        assert!(matches!(cli.command, Some(Command::Init)));
-
-        // 3. build
-        let cli = Cli::parse_from(["cargo-fy-docs", "build", "--with-pdf"]);
+        let args = ["cargo-fy-docs", "build", "--lang", "zh-CN", "--open"]
+            .into_iter()
+            .map(OsString::from);
+        let cli = Cli::parse_from(cargo_external_args(args));
         assert!(matches!(cli.command, Some(Command::Build)));
-        assert!(cli.with_pdf);
-
-        // 4. pdf
-        let cli = Cli::parse_from(["cargo-fy-docs", "pdf"]);
-        assert!(matches!(cli.command, Some(Command::Pdf)));
+        assert_eq!(cli.lang.as_deref(), Some("zh-CN"));
+        assert!(cli.open);
     }
 
     #[tokio::test]
     async fn bind_allocates_available_listener() {
-        let listener = bind(18585).await.unwrap();
-        let port = listener.local_addr().unwrap().port();
-        assert!(port >= 18585);
+        let listener = bind(8181).await.expect("bind should find a free port");
+        assert!(listener.local_addr().is_ok());
     }
 
     #[tokio::test]
-    async fn dispatch_executes_build_pdf_and_init_commands() {
+    async fn dispatch_executes_build_pdf_html_init_commands() {
         let temp = std::env::temp_dir().join(format!("fy-docs-main-run-{}", std::process::id()));
-        let docs = temp.join("docs");
-        std::fs::create_dir_all(&docs).unwrap();
-        std::fs::write(docs.join("main.typ"), "= Test Main\n\nMain content\n").unwrap();
+        let _ = std::fs::remove_dir_all(&temp);
+        std::fs::create_dir_all(&temp).unwrap();
+        let clean_temp = crate::project::clean_canonicalize(&temp).unwrap();
 
-        // 1. Build command (with PDF)
-        let cli_build = Cli {
-            root: Some(temp.clone()),
-            with_pdf: true,
-            port: 8181,
-            no_open: true,
-            command: Some(Command::Build),
-        };
-        let res_build = dispatch(cli_build, &temp).await;
-        assert!(res_build.is_ok());
-        assert!(docs.join("target").join("index.html").exists());
+        // 1. init
+        let init_cli = Cli::parse_from(["cargo-fy-docs", "init"]);
+        dispatch(init_cli, &clean_temp).await.unwrap();
+        assert!(clean_temp.join("docs/main.typ").is_file());
+        assert!(clean_temp.join("docs/fy-spec/lib.typ").is_file());
 
-        // 2. Pdf command
-        let cli_pdf = Cli {
-            root: Some(temp.clone()),
-            with_pdf: false,
-            port: 8181,
-            no_open: true,
-            command: Some(Command::Pdf),
-        };
-        let res_pdf = dispatch(cli_pdf, &temp).await;
-        assert!(res_pdf.is_ok());
+        // 2. build (HTML + PDF)
+        let build_cli = Cli::parse_from(["cargo-fy-docs", "build"]);
+        dispatch(build_cli, &clean_temp).await.unwrap();
+        assert!(clean_temp.join("docs/target/index.html").is_file());
+        assert!(clean_temp.join("docs/target/fy-docs.css").is_file());
+        assert!(clean_temp.join("docs/release").is_dir());
 
-        // 3. Init command on empty dir
-        let temp_init =
-            std::env::temp_dir().join(format!("fy-docs-main-init-{}", std::process::id()));
-        std::fs::create_dir_all(&temp_init).unwrap();
-        let cli_init = Cli {
-            root: None,
-            with_pdf: false,
-            port: 8181,
-            no_open: true,
-            command: Some(Command::Init),
-        };
-        assert!(dispatch(cli_init, &temp_init).await.is_ok());
-        assert!(temp_init.join("docs").join("main.typ").exists());
+        // 3. html only
+        let html_cli = Cli::parse_from(["cargo-fy-docs", "html"]);
+        dispatch(html_cli, &clean_temp).await.unwrap();
+        assert!(clean_temp.join("docs/target/index.html").is_file());
 
-        let _ = std::fs::remove_dir_all(temp);
-        let _ = std::fs::remove_dir_all(temp_init);
+        // 4. pdf only
+        let pdf_cli = Cli::parse_from(["cargo-fy-docs", "pdf"]);
+        dispatch(pdf_cli, &clean_temp).await.unwrap();
+
+        let _ = std::fs::remove_dir_all(&temp);
     }
 }

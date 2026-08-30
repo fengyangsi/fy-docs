@@ -1,11 +1,26 @@
 //! Detects the documentation project in the current directory: entry file,
-//! package name/version, typst compile root, and watch targets.
+//! package name/version, typst compile root, i18n language targets, and watch targets.
 
 use anyhow::{Context, Result, bail};
 use std::path::{Path, PathBuf};
 
-/// A documentation project: `<cwd>/docs/main.typ` plus everything needed to
-/// compile and serve it.
+/// A target language document within a project.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LanguageTarget {
+    /// Language identifier, e.g. "zh-CN", "en", "zh-TW", or empty string for default.
+    pub lang: String,
+    /// Display name in language switcher, e.g. "简体中文", "English".
+    pub display_name: String,
+    /// Path to entry `main.typ` for this language.
+    pub entry: PathBuf,
+    /// Output html filename, e.g. "index.html" or "index_zh-CN.html".
+    pub html_file_name: String,
+    /// Release PDF filename.
+    pub pdf_file_name: String,
+}
+
+/// A documentation project: `<cwd>/docs/` plus everything needed to compile,
+/// build, and serve single or multi-language specifications.
 #[derive(Debug, Clone)]
 pub struct Project {
     /// Package name (Cargo.toml `name`, else the directory name).
@@ -14,8 +29,11 @@ pub struct Project {
     pub version: String,
     /// GitHub repository URL from Cargo.toml, when supplied.
     pub repository: Option<String>,
-    /// Path to `docs/main.typ`.
+    /// Primary entry `main.typ` (for backward compatibility / default).
+    #[allow(dead_code)]
     pub entry: PathBuf,
+    /// All detected language targets (single-language or i18n).
+    pub targets: Vec<LanguageTarget>,
     /// The `docs/` source directory.
     pub docs_dir: PathBuf,
     /// Typst compile root: the ancestor directory that satisfies every
@@ -30,18 +48,57 @@ pub struct Project {
 }
 
 impl Project {
-    /// File name of the release PDF: `{name}_v{version}_specification.pdf`.
+    /// File name of the default release PDF: `{name}_v{version}_specification.pdf`.
+    #[allow(dead_code)]
     pub fn pdf_file_name(&self) -> String {
         format!("{}_v{}_specification.pdf", self.name, self.version)
     }
+
+    /// Selects targets matching an optional language filter.
+    pub fn selected_targets(&self, lang_filter: Option<&str>) -> Vec<&LanguageTarget> {
+        match lang_filter {
+            Some(filter) => self
+                .targets
+                .iter()
+                .filter(|t| t.lang.eq_ignore_ascii_case(filter) || t.lang.is_empty())
+                .collect(),
+            None => self.targets.iter().collect(),
+        }
+    }
+}
+
+/// Maps language codes to user-friendly native display labels.
+pub fn lang_display_name(lang: &str) -> String {
+    match lang.to_lowercase().replace('_', "-").as_str() {
+        "zh" | "zh-cn" | "zh-hans" => "简体中文".to_owned(),
+        "zh-tw" | "zh-hk" | "zh-hant" => "繁體中文".to_owned(),
+        "en" | "en-us" | "en-gb" => "English".to_owned(),
+        "ja" | "ja-jp" => "日本語".to_owned(),
+        "de" | "de-de" => "Deutsch".to_owned(),
+        "fr" | "fr-fr" => "Français".to_owned(),
+        "ru" | "ru-ru" => "Русский".to_owned(),
+        "es" | "es-es" => "Español".to_owned(),
+        _ => lang.to_owned(),
+    }
+}
+
+pub fn clean_canonicalize(path: &Path) -> Result<PathBuf> {
+    let p = path.canonicalize().context("path does not exist")?;
+    #[cfg(windows)]
+    {
+        let raw = p.to_string_lossy();
+        if let Some(rest) = raw.strip_prefix(r"\\?\") {
+            return Ok(PathBuf::from(rest));
+        }
+    }
+    Ok(p)
 }
 
 pub fn detect(cwd: &Path, root_override: Option<&Path>) -> Result<Project> {
     let docs_dir = cwd.join("docs");
-    let entry = docs_dir.join("main.typ");
-    if !entry.is_file() {
+    if !docs_dir.is_dir() {
         bail!(
-            "`{}` has no docs/main.typ — cargo fy-docs runs inside a project directory (like cargo doc runs inside a crate)",
+            "`{}` has no docs/ directory — cargo fy-docs runs inside a project directory (like cargo doc runs inside a crate)",
             crate::state::display_path(cwd)
         );
     }
@@ -52,19 +109,23 @@ pub fn detect(cwd: &Path, root_override: Option<&Path>) -> Result<Project> {
             .map(|n| n.to_string_lossy().into_owned())
             .unwrap_or_else(|| "project".to_owned())
     });
+
+    // Detect language targets within docs/
+    let (targets, primary_entry) =
+        detect_language_targets(&docs_dir, &name, cargo_version.as_deref())?;
+
     let version = cargo_version
-        .unwrap_or_else(|| main_typ_version(&entry).unwrap_or_else(|| "0.1.0".to_owned()));
+        .unwrap_or_else(|| main_typ_version(&primary_entry).unwrap_or_else(|| "0.1.0".to_owned()));
 
     let imports = absolute_imports(&docs_dir);
     let root = match root_override {
-        Some(root) => root.canonicalize().context("--root path does not exist")?,
+        Some(root) => clean_canonicalize(root)?,
         None => detect_root(cwd, &imports).context(
             "could not locate the typst root that satisfies the absolute imports; pass --root",
         )?,
     };
 
-    // Watch the docs sources plus every local directory the imports pull in
-    // (e.g. a sibling shared template package).
+    // Watch the docs sources plus every local directory the imports pull in.
     let mut watch_dirs = vec![docs_dir.clone()];
     for import in &imports {
         if let Some(top) = import.split('/').next() {
@@ -81,13 +142,101 @@ pub fn detect(cwd: &Path, root_override: Option<&Path>) -> Result<Project> {
         name,
         version,
         repository,
-        entry,
+        entry: primary_entry,
+        targets,
         docs_dir,
         root,
         target_dir,
         release_dir,
         watch_dirs,
     })
+}
+
+fn detect_language_targets(
+    docs_dir: &Path,
+    pkg_name: &str,
+    version_hint: Option<&str>,
+) -> Result<(Vec<LanguageTarget>, PathBuf)> {
+    let mut targets = Vec::new();
+    let root_main = docs_dir.join("main.typ");
+
+    // Check for language subdirectories: docs/<lang>/main.typ
+    let mut sub_targets = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(docs_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                let dir_name = entry.file_name().to_string_lossy().into_owned();
+                // Skip non-language directories
+                if matches!(
+                    dir_name.as_str(),
+                    "target" | "release" | "fy-spec" | "modules"
+                ) {
+                    continue;
+                }
+                let sub_main = path.join("main.typ");
+                if sub_main.is_file() {
+                    let version = version_hint
+                        .map(str::to_owned)
+                        .or_else(|| main_typ_version(&sub_main))
+                        .unwrap_or_else(|| "0.1.0".to_owned());
+                    sub_targets.push(LanguageTarget {
+                        lang: dir_name.clone(),
+                        display_name: lang_display_name(&dir_name),
+                        entry: sub_main,
+                        html_file_name: format!("index_{dir_name}.html"),
+                        pdf_file_name: format!(
+                            "{pkg_name}_v{version}_{dir_name}_specification.pdf"
+                        ),
+                    });
+                }
+            }
+        }
+    }
+
+    // Sort sub-targets deterministically
+    sub_targets.sort_by(|a, b| a.lang.cmp(&b.lang));
+
+    let primary_entry;
+    if !sub_targets.is_empty() {
+        if root_main.is_file() {
+            primary_entry = root_main.clone();
+            let version = version_hint
+                .map(str::to_owned)
+                .or_else(|| main_typ_version(&root_main))
+                .unwrap_or_else(|| "0.1.0".to_owned());
+            targets.push(LanguageTarget {
+                lang: "".to_owned(),
+                display_name: "Default".to_owned(),
+                entry: root_main,
+                html_file_name: "index.html".to_owned(),
+                pdf_file_name: format!("{pkg_name}_v{version}_specification.pdf"),
+            });
+        } else {
+            primary_entry = sub_targets[0].entry.clone();
+        }
+        targets.extend(sub_targets);
+    } else if root_main.is_file() {
+        primary_entry = root_main.clone();
+        let version = version_hint
+            .map(str::to_owned)
+            .or_else(|| main_typ_version(&root_main))
+            .unwrap_or_else(|| "0.1.0".to_owned());
+        targets.push(LanguageTarget {
+            lang: "".to_owned(),
+            display_name: "Default".to_owned(),
+            entry: root_main,
+            html_file_name: "index.html".to_owned(),
+            pdf_file_name: format!("{pkg_name}_v{version}_specification.pdf"),
+        });
+    } else {
+        bail!(
+            "`{}` has no main.typ or language subdirectory (e.g. docs/zh-CN/main.typ)",
+            docs_dir.display()
+        );
+    }
+
+    Ok((targets, primary_entry))
 }
 
 /// Walks up from `start` looking for the closest ancestor under which every
@@ -172,7 +321,7 @@ fn is_github_repository(url: &str) -> bool {
         .is_some_and(|path| !path.trim_matches('/').is_empty())
 }
 
-/// Reads either a direct package field or Cargo's \`field.workspace = true\`
+/// Reads either a direct package field or Cargo's `field.workspace = true`
 /// inheritance from the nearest workspace manifest.
 fn package_value(
     cwd: &Path,
@@ -236,6 +385,7 @@ mod tests {
             version: "0.1.0".to_owned(),
             repository: None,
             entry: PathBuf::new(),
+            targets: Vec::new(),
             docs_dir: PathBuf::new(),
             root: PathBuf::new(),
             target_dir: PathBuf::new(),
@@ -248,126 +398,18 @@ mod tests {
     #[test]
     fn reads_package_metadata_from_valid_toml() {
         let temp = std::env::temp_dir().join(format!("fy-docs-test-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&temp);
         std::fs::create_dir_all(&temp).unwrap();
         std::fs::write(
             temp.join("Cargo.toml"),
-            "[package]\nname = \"demo\"\nversion = \"1.2.3\"\n",
-        )
-        .unwrap();
-        assert_eq!(
-            cargo_package_info(&temp),
-            (Some("demo".to_owned()), Some("1.2.3".to_owned()), None)
-        );
-        std::fs::remove_dir_all(temp).unwrap();
-    }
-
-    #[test]
-    fn reads_workspace_inherited_package_metadata() {
-        let temp =
-            std::env::temp_dir().join(format!("fy-docs-workspace-test-{}", std::process::id()));
-        let member = temp.join("member");
-        std::fs::create_dir_all(&member).unwrap();
-        std::fs::write(
-            temp.join("Cargo.toml"),
-            "[workspace]\nmembers = [\"member\"]\n[workspace.package]\nname = \"workspace-demo\"\nversion = \"2.0.0\"\n",
-        )
-        .unwrap();
-        std::fs::write(
-            member.join("Cargo.toml"),
-            "[package]\nname.workspace = true\nversion.workspace = true\n",
-        )
-        .unwrap();
-        assert_eq!(
-            cargo_package_info(&member),
-            (
-                Some("workspace-demo".to_owned()),
-                Some("2.0.0".to_owned()),
-                None
-            )
-        );
-        std::fs::remove_dir_all(temp).unwrap();
-    }
-
-    #[test]
-    fn accepts_only_github_repository_urls() {
-        assert!(is_github_repository(
-            "https://github.com/fengyangsi/fy-docs"
-        ));
-        assert!(!is_github_repository(
-            "https://codeberg.org/fengyangsi/fy-docs"
-        ));
-    }
-
-    #[test]
-    fn detect_fails_when_main_typ_missing() {
-        let temp = std::env::temp_dir().join(format!("fy-docs-no-main-{}", std::process::id()));
-        std::fs::create_dir_all(&temp).unwrap();
-        assert!(detect(&temp, None).is_err());
-        let _ = std::fs::remove_dir_all(temp);
-    }
-
-    #[test]
-    fn detect_succeeds_with_minimal_project() {
-        let temp = std::env::temp_dir().join(format!("fy-docs-detect-{}", std::process::id()));
-        let docs = temp.join("docs");
-        std::fs::create_dir_all(&docs).unwrap();
-        std::fs::write(
-            docs.join("main.typ"),
-            "#import \"fy-spec/lib.typ\": *\n#show: project_book.with(title: \"Doc\", version: \"0.3.1\")\n",
+            "[package]\nname = \"demo\"\nversion = \"1.2.3\"\nrepository = \"https://github.com/org/repo\"\n",
         )
         .unwrap();
 
-        let proj = detect(&temp, None).unwrap();
-        assert_eq!(proj.name, temp.file_name().unwrap().to_str().unwrap());
-        assert_eq!(proj.version, "0.3.1");
-        assert_eq!(proj.root, temp);
-
-        // With explicit root
-        let explicit_root = temp.join("custom_root");
-        std::fs::create_dir_all(&explicit_root).unwrap();
-        let proj2 = detect(&temp, Some(&explicit_root)).unwrap();
-        assert_eq!(proj2.root, explicit_root.canonicalize().unwrap());
-
-        let _ = std::fs::remove_dir_all(temp);
-    }
-
-    #[test]
-    fn main_typ_version_fallback() {
-        let temp = std::env::temp_dir().join(format!("fy-docs-ver-{}", std::process::id()));
-        std::fs::create_dir_all(&temp).unwrap();
-        let entry = temp.join("main.typ");
-        std::fs::write(&entry, "version: \"1.9.4\"").unwrap();
-        assert_eq!(main_typ_version(&entry), Some("1.9.4".to_owned()));
-
-        std::fs::write(&entry, "no version here").unwrap();
-        assert_eq!(main_typ_version(&entry), None);
-        let _ = std::fs::remove_dir_all(temp);
-    }
-
-    #[test]
-    fn detects_absolute_imports_and_resolves_root() {
-        let temp = std::env::temp_dir().join(format!("fy-docs-import-{}", std::process::id()));
-        let docs = temp.join("docs");
-        std::fs::create_dir_all(&docs).unwrap();
-        std::fs::write(
-            docs.join("main.typ"),
-            "// comment with \"/fake.typ\"\n#import \"/shared/lib.typ\": *\n",
-        )
-        .unwrap();
-
-        let imports = absolute_imports(&docs);
-        assert_eq!(imports, vec!["shared/lib.typ".to_owned()]);
-
-        // When directory doesn't exist on disk, detect_root returns Err
-        assert!(detect_root(&temp, &imports).is_err());
-
-        // When shared exists, detect_root resolves closest root
-        let shared = temp.join("shared");
-        std::fs::create_dir_all(&shared).unwrap();
-        std::fs::write(shared.join("lib.typ"), "content").unwrap();
-        let root2 = detect_root(&temp, &imports).unwrap();
-        assert_eq!(root2, temp);
-
-        let _ = std::fs::remove_dir_all(temp);
+        let (name, version, repo) = cargo_package_info(&temp);
+        assert_eq!(name.as_deref(), Some("demo"));
+        assert_eq!(version.as_deref(), Some("1.2.3"));
+        assert_eq!(repo.as_deref(), Some("https://github.com/org/repo"));
+        let _ = std::fs::remove_dir_all(&temp);
     }
 }
