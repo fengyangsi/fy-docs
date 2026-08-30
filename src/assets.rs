@@ -191,10 +191,15 @@ pub fn redirect_page(all_targets: &[LanguageTarget]) -> String {
 
     let default_target = distinct
         .iter()
-        .find(|t| t.lang.eq_ignore_ascii_case("zh-cn") || t.lang.eq_ignore_ascii_case("zh"))
+        .find(|t| t.lang.eq_ignore_ascii_case("en") || t.lang.to_lowercase().starts_with("en-"))
+        .or_else(|| {
+            distinct
+                .iter()
+                .find(|t| t.lang.eq_ignore_ascii_case("zh-cn") || t.lang.eq_ignore_ascii_case("zh"))
+        })
         .or_else(|| distinct.first())
         .map(|t| t.html_file_name.as_str())
-        .unwrap_or("index_zh-CN.html");
+        .unwrap_or("index_en.html");
 
     let mut links = String::new();
     for (i, t) in distinct.iter().enumerate() {
@@ -312,5 +317,6 @@ mod tests {
         assert!(html.contains(r#""en":"index_en.html""#));
         assert!(html.contains(r#"<a href="index_zh-CN.html">简体中文</a>"#));
         assert!(html.contains(r#"<a href="index_ja.html">日本語</a>"#));
+        assert!(html.contains("location.replace('index_en.html')"));
     }
 }
