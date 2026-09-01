@@ -102,6 +102,10 @@ html.ayu {
 
 :root {
   --fy-sidebar-width: 18.75rem;
+  --fy-page-max: 820px;
+  --fy-measure: 756px;
+  --fy-page-wide: 1180px;
+  --fy-page-ultra: 1440px;
   --paper: var(--bg);
   --heading: var(--ink);
   --muted: color-mix(in srgb, var(--ink) 72%, var(--bg));
@@ -480,11 +484,24 @@ body {
 }
 
 .fy-page {
-  max-width: 820px;
+  max-width: var(--fy-page-max);
   margin: 0 auto;
   min-height: 100%;
   padding: 88px 32px 96px;
   background: var(--paper);
+}
+
+/* Wide screens buy room for over-long material, never for prose. Both shapes
+   are targeted because viewer.js moves the blocks into section.fy-chapter. */
+@media (min-width: 1280px) {
+  .fy-page { max-width: var(--fy-page-wide); }
+  .fy-doc > :not(.fy-chapter), .fy-chapter > * { max-width: var(--fy-measure); }
+  .fy-doc > :is(pre, figure, svg),
+  .fy-chapter > :is(.fy-code-block, pre, figure, svg) { max-width: none; }
+}
+
+@media (min-width: 1800px) {
+  .fy-page { max-width: var(--fy-page-ultra); }
 }
 
 /* ---- document page -------------------------------------------------------- */
@@ -723,7 +740,12 @@ body {
 .fy-pager-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fy-pager-pos { color: var(--muted); font-size: 0.8rem; white-space: nowrap; }
 .fy-pager-hidden { visibility: hidden; pointer-events: none; }
-.fy-toc-active { color: var(--sidebar-active) !important; font-weight: 700; }
+.fy-toc-active {
+  color: var(--sidebar-active) !important;
+  font-weight: 700;
+  background: color-mix(in srgb, var(--sidebar-active) 14%, var(--sidebar-bg));
+}
+.fy-toc-chapter-active { color: var(--sidebar-active); font-weight: 600; }
 
 @media (max-width: 640px) {
   .fy-page { padding: 72px 18px 64px; }

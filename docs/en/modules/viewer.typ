@@ -15,6 +15,14 @@ The three files are shipped byte-for-byte: no bundler and no transpiler stand be
 ]
 
 #contract[
+  The sidebar follows the reader, not the last click. Only the visible chapter's headings participate, and only those that carry an `id` and have a table-of-contents entry; an entry pointing outside the chapter can never light up. A passive scroll listener on `.fy-content` — the element that actually scrolls — drives the recomputation, coalesced to one pass per animation frame and repeated on resize, by these three rules in order: the last heading at or above the top edge of the visible area, or the first one while none has reached it, or the last one once the container is scrolled to its bottom, which is the only way a trailing section too short to reach the top edge becomes reachable. Switching chapters rebuilds the participant list from the new chapter's headings.
+]
+
+#contract[
+  Two granularities light up at once: the active heading's own entry carries `fy-toc-active`, and the entry of the chapter that contains it carries `fy-toc-chapter-active`, so a reader inside `3.2` still sees `3` marked as the containing chapter. When the active heading is the chapter's opening heading, the same entry carries both classes and the position class is the one that shows. An outline that stops at a single level degrades to `fy-toc-active` alone.
+]
+
+#contract[
   Left and right arrow keys move between chapters, unless the event is already handled, carries a modifier, or originates in a text field, textarea, select or content-editable node.
 ]
 
@@ -28,6 +36,10 @@ The three files are shipped byte-for-byte: no bundler and no transpiler stand be
 
 #contract[
   `base.css` carries, besides the palettes, per-theme overrides for the literal hex colors typst bakes into exported diagram SVGs, so an embedded DAG follows the active palette instead of staying on the template's light background.
+]
+
+#contract[
+  Line length is a measure, not a share of the window. Below a 1280 px viewport the document is one centered column capped at `--fy-page-max` — 820 px, whose 32 px side padding leaves a 756 px `--fy-measure`. From 1280 px the page box grows to `--fy-page-wide` (1180 px) and from 1800 px to `--fy-page-ultra` (1440 px), while every top-level block of the document stays pinned to that same 756 px measure; a code block, a figure — the wrapper typst gives every table and diagram — and a bare exported SVG alone are released from it, so a wide screen buys width for the material that would otherwise overflow sideways instead of stretching prose. The cap is written for both shapes of the flow — the blocks typst emits under `#doc-body`, and those same blocks after the chapter grouping refiles them under `section.fy-chapter` — and it never binds a chapter shell itself, because a shell held to the measure would re-clip the very material released from it.
 ]
 
 #contract[

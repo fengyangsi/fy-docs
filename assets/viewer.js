@@ -229,6 +229,65 @@
     });
   }
 
+  /* ---------- sidebar position tracking ---------- */
+
+  var content = document.querySelector('.fy-content');
+  var tocLink = Object.create(null);
+  if (toc) {
+    Array.prototype.forEach.call(toc.querySelectorAll('a[href^="#"]'), function (link) {
+      var id = decodeURIComponent(link.getAttribute('href').slice(1));
+      if (!Object.prototype.hasOwnProperty.call(tocLink, id)) tocLink[id] = link;
+    });
+  }
+
+  var watched = [];
+  var positionFrame = 0;
+  var positionLink = null;
+  var chapterLink = null;
+
+  function watchChapter(chapter) {
+    watched = [];
+    if (!chapter) return;
+    Array.prototype.forEach.call(chapter.el.querySelectorAll('[id]'), function (node) {
+      if (/^H[1-6]$/.test(node.tagName) && tocLink[node.id]) {
+        watched.push({ el: node, link: tocLink[node.id] });
+      }
+    });
+  }
+
+  function markLinks(link, owner) {
+    if (positionLink && positionLink !== link) positionLink.classList.remove('fy-toc-active');
+    positionLink = link;
+    if (link) link.classList.add('fy-toc-active');
+    if (chapterLink && chapterLink !== owner) chapterLink.classList.remove('fy-toc-chapter-active');
+    chapterLink = owner;
+    if (owner) owner.classList.add('fy-toc-chapter-active');
+  }
+
+  function markPosition() {
+    if (!toc || !chapters.length) return;
+    var owner = tocLink[chapters[active < 0 ? 0 : active].firstId] || null;
+    if (!watched.length) { markLinks(null, owner); return; }
+    var top = content.getBoundingClientRect().top;
+    var index = 0;
+    for (var i = 0; i < watched.length; i += 1) {
+      if (watched[i].el.getBoundingClientRect().top - top <= 1) index = i;
+    }
+    if (content.scrollTop + content.clientHeight >= content.scrollHeight - 1) {
+      index = watched.length - 1;
+    }
+    markLinks(watched[index].link, owner);
+  }
+
+  content.addEventListener('scroll', function () {
+    if (positionFrame) return;
+    positionFrame = window.requestAnimationFrame(function () {
+      positionFrame = 0;
+      markPosition();
+    });
+  }, { passive: true });
+  window.addEventListener('resize', markPosition);
+
   /* ---------- document search and printing ---------- */
 
   var searchToggle = $('fy-search-toggle');
@@ -349,14 +408,7 @@
     fillLink(nextLink, index + 1);
     position.textContent = TEXT.position(index + 1, chapters.length);
 
-    Array.prototype.forEach.call(toc.querySelectorAll('.fy-toc-active'), function (node) {
-      node.classList.remove('fy-toc-active');
-    });
-    var firstId = chapters[index].firstId;
-    if (firstId) {
-      var tocLink = toc.querySelector('a[href="#' + firstId + '"]');
-      if (tocLink) tocLink.classList.add('fy-toc-active');
-    }
+    watchChapter(chapters[index]);
 
     if (window.innerWidth < MOBILE_BREAKPOINT) setSidebar(false);
 
@@ -365,11 +417,13 @@
       if (target) {
         target.scrollIntoView({ block: 'start' });
         history.replaceState(null, '', '#' + anchorId);
+        markPosition();
         return;
       }
     }
     history.replaceState(null, '', window.location.pathname + window.location.search);
-    document.querySelector('.fy-content').scrollTop = 0;
+    content.scrollTop = 0;
+    markPosition();
   }
 
   document.addEventListener('click', function (event) {
@@ -446,6 +500,8 @@
     var startId = decodeURIComponent(window.location.hash.slice(1));
     var start = Object.prototype.hasOwnProperty.call(idToChapter, startId) ? idToChapter[startId] : 0;
     go(start, startId || null);
+  } else if (chapters.length) {
+    watchChapter(chapters[0]);
   }
 })();
 
