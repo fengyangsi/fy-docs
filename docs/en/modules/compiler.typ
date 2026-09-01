@@ -13,6 +13,14 @@ The `compiler` module invokes the `typst` CLI to produce modern HTML output and 
 ]
 
 #contract[
+  When the HTML export's root `lang` disagrees with the content language resolved for that target, the build warns on stderr naming both tags (a `docs/zh-CN/main.typ` declaring `lang: "en"` is the case in point: the page calls itself `zh-CN` while Typst typesets English). The resolved content language is never overwritten by the export value.
+]
+
+#logic-box[
+  `extract_root_lang(html: &str) -> Option<String>` reads the `lang="..."` inside the opening `<html ...>` tag only: a `lang` attribute in the body (`<p lang="zh">`) and a root tag without `lang` both yield `None`. `language_drift(target: &LanguageTarget, exported: Option<&str>) -> Option<String>` compares both sides after `normalize_lang` and returns warning text only when both are present and differ. The warning goes to stderr through `state::log`; it never rewrites `content_lang` and never changes the exit code.
+]
+
+#contract[
   A build removes the `_temp_*.html` compile intermediates an interrupted process left behind.
 ]
 

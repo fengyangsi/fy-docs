@@ -13,6 +13,14 @@
 ]
 
 #contract[
+  HTML 导出根标签的 `lang` 与该语言目标解析出的内容语言不一致时，构建在 stderr 输出一条同时给出两个标签的 warning（例如 `docs/zh-CN/main.typ` 内声明 `lang: "en"`：页面自称 `zh-CN`，Typst 却按英文排版）。解析出的内容语言不被导出值覆盖。
+]
+
+#logic-box[
+  `extract_root_lang(html: &str) -> Option<String>` 只解析起始 `<html ...>` 标签内的 `lang="..."`：正文里的 `lang` 属性（`<p lang="zh">`）与不带 `lang` 的根标签都返回 `None`。`language_drift(target: &LanguageTarget, exported: Option<&str>) -> Option<String>` 将两侧经 `normalize_lang` 归一化后比较，仅在同时存在且不等时返回告警文本；告警经 `state::log` 写入 stderr，不改写 `content_lang`，也不影响退出码。
+]
+
+#contract[
   构建开始时清除上一进程被强制中断遗留的 `_temp_*.html` 编译中间文件。
 ]
 

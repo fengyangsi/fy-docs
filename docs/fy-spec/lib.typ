@@ -210,6 +210,10 @@
 }
 
 /// Renders an ISO B5 specification book for a project.
+///
+/// `lang` declares the document's content language: Typst typesets from it, and
+/// fy-docs reports the same tag as the generated page's `<html lang>` and picks
+/// its toolbar labels from it.
 #let project_book(
   title: "Project Specification",
   subtitle: none,

@@ -9,7 +9,15 @@
 ]
 
 #contract[
-  页面根元素的 `lang` 描述**正文语言**：具名语言目标输出其规范化 BCP 47 标签（`pt_BR` → `pt-BR`，基础子标签小写、地区全大写、文字子标签首字母大写），无标签的 default 目标按正文推断（含 CJK 表意文字取 `zh-CN`，否则 `en`）。顶栏 chrome 文案仅有中英两套，由 `viewer.js` 依 `lang` 的语言前缀择一渲染，因此正文语言与 chrome 语言互不干涉：未被翻译的语言以英文 chrome 呈现，根标签仍如实标注该语言。
+  页面根元素的 `lang` 描述**正文内容语言**：取 `project` 为该语言目标解析出的内容标签，并按 BCP 47 形态规范化（`pt_BR` → `pt-BR`，基础子标签小写、地区全大写、文字子标签首字母大写）。该标签只来自声明，绝不从正文字形推断。
+]
+
+#contract[
+  顶栏 chrome 文案仅有中英两套：服务端渲染模板与 `viewer.js` 都按根 `lang` 的 `zh` 前缀各取一套，因此正文语言与 chrome 语言互不干涉——未被翻译的语言以英文 chrome 呈现，根标签仍如实标注该语言。
+]
+
+#logic-box[
+  文案选择是纯函数 `ui_text(content_lang: &str) -> UiText`：输入只有内容语言，正文不参与；`normalize_lang` 后以 `zh` 开头取中文文案，其余（含空串）一律英文。页面 `lang` 属性直接取 `LanguageTarget.content_lang`，与 `ui_text` 的入参是同一个值。
 ]
 
 #contract[

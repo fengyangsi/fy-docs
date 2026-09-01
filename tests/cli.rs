@@ -206,3 +206,83 @@ fn successful_build_surfaces_typst_warnings() {
         "typst warnings must reach stderr: {stderr}"
     );
 }
+
+#[test]
+fn a_declared_language_reaches_the_page_and_its_labels() {
+    if !typst_available() {
+        eprintln!("skipping: typst is not on PATH");
+        return;
+    }
+    let temp = tempfile::tempdir().unwrap();
+    binary()
+        .arg("init")
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    let entry = temp.path().join("docs/main.typ");
+    let main = std::fs::read_to_string(&entry).unwrap();
+    std::fs::write(&entry, main.replace(r#"lang: "en""#, r#"lang: "zh-CN""#)).unwrap();
+
+    let build = binary()
+        .arg("html")
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        build.status.success(),
+        "build failed: {}",
+        String::from_utf8_lossy(&build.stderr)
+    );
+    let page = std::fs::read_to_string(temp.path().join("docs/target/index.html")).unwrap();
+    assert!(page.contains(r#"<html lang="zh-CN">"#), "{page}");
+    assert!(page.contains(r#"title="主题""#), "{page}");
+    // Declaration and export agree, so there is nothing to warn about.
+    let stderr = String::from_utf8_lossy(&build.stderr);
+    assert!(
+        !stderr.contains("typst typesets"),
+        "a matching declaration must stay quiet: {stderr}"
+    );
+}
+
+#[test]
+fn a_folder_and_entry_that_disagree_are_reported() {
+    if !typst_available() {
+        eprintln!("skipping: typst is not on PATH");
+        return;
+    }
+    let temp = tempfile::tempdir().unwrap();
+    binary()
+        .arg("init")
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    // The starter entry declares English; moving it under a zh-CN folder makes
+    // the two declaration channels disagree about the same document.
+    let main = std::fs::read_to_string(temp.path().join("docs/main.typ")).unwrap();
+    std::fs::create_dir_all(temp.path().join("docs/zh-CN")).unwrap();
+    std::fs::write(
+        temp.path().join("docs/zh-CN/main.typ"),
+        main.replace("\"fy-spec/lib.typ\"", "\"../fy-spec/lib.typ\""),
+    )
+    .unwrap();
+    std::fs::remove_file(temp.path().join("docs/main.typ")).unwrap();
+
+    let build = binary()
+        .arg("html")
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        build.status.success(),
+        "a divergence must not fail the build: {}",
+        String::from_utf8_lossy(&build.stderr)
+    );
+    let stderr = String::from_utf8_lossy(&build.stderr);
+    assert!(
+        stderr.contains("typst typesets `en`") && stderr.contains("reports `zh-CN`"),
+        "the drift must name both tags: {stderr}"
+    );
+    // The folder still decides what the page calls itself.
+    let page = std::fs::read_to_string(temp.path().join("docs/target/index_zh-CN.html")).unwrap();
+    assert!(page.contains(r#"<html lang="zh-CN">"#), "{page}");
+}

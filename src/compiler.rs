@@ -1,7 +1,7 @@
 //! Invokes the typst CLI and renders the self-contained static page(s) into
 //! `docs/target/`, plus the print-edition PDF(s) into `docs/release/`.
 
-use crate::project::{LanguageTarget, Project};
+use crate::project::{LanguageTarget, Project, normalize_lang};
 use crate::state::AppState;
 use anyhow::{Context, Result, anyhow, bail};
 use std::fs;
@@ -149,16 +149,14 @@ fn generate(project: &Project, with_pdf: bool, lang_filter: Option<&str>) -> Res
             &project.name,
             project.repository.as_deref(),
             body.trim(),
-            Some(lang_target),
+            lang_target,
             &project.targets,
         );
         write_atomic(&target.join(&lang_target.html_file_name), &page_html)?;
     }
 
     for (lang_target, err) in &failures {
-        if let Err(write_err) =
-            write_error_page(project, err, &lang_target.html_file_name, &lang_target.lang)
-        {
+        if let Err(write_err) = write_error_page(project, err, lang_target) {
             crate::state::log(&format!(
                 "[fy-docs] could not write error page for [{}]: {write_err}",
                 lang_label(lang_target)
@@ -185,7 +183,7 @@ fn generate(project: &Project, with_pdf: bool, lang_filter: Option<&str>) -> Res
                 &project.name,
                 project.repository.as_deref(),
                 body.trim(),
-                Some(first_target),
+                first_target,
                 &project.targets,
             );
             write_atomic(&target.join(INDEX_FILE), &default_page)?;
@@ -287,6 +285,9 @@ fn compile_html_target(
         })?;
 
         let html = fs::read_to_string(&temp_html)?;
+        if let Some(note) = language_drift(lang_target, extract_root_lang(&html).as_deref()) {
+            crate::state::log(&note);
+        }
         let title =
             extract_between(&html, "<title>", "</title>").unwrap_or_else(|| project.name.clone());
         let styles = extract_all_styles(&html);
@@ -295,6 +296,52 @@ fn compile_html_target(
     })();
     let _ = fs::remove_file(&temp_html);
     parts
+}
+
+/// Reads the `lang` attribute of the root `<html>` start tag of a typst export.
+/// Only that tag is scanned and an attribute name must start on a whitespace
+/// boundary, so a `lang` deeper in the body and `xml:lang` are both ignored.
+fn extract_root_lang(html: &str) -> Option<String> {
+    let tag_start = html.find("<html")? + "<html".len();
+    let attributes = &html[tag_start..tag_start + html[tag_start..].find('>')?];
+    let mut offset = 0;
+    while let Some(found) = attributes[offset..].find("lang") {
+        let at = offset + found;
+        offset = at + "lang".len();
+        if !attributes[..at].ends_with(char::is_whitespace) {
+            continue;
+        }
+        let Some(value) = attributes[at + "lang".len()..].strip_prefix('=') else {
+            continue;
+        };
+        let Some(value) = value.trim_start().strip_prefix('"') else {
+            continue;
+        };
+        let Some(end) = value.find('"') else {
+            continue;
+        };
+        return Some(value[..end].to_owned());
+    }
+    None
+}
+
+/// Describes a target whose exported language disagrees with the one fy-docs
+/// resolved from declarations. The two share a single root — the `lang:` the
+/// template sets and the directory name — so a divergence means one of them is
+/// stale. Case and separator variants name the same tag and stay quiet, and an
+/// export without a root language offers nothing to compare.
+fn language_drift(target: &LanguageTarget, exported: Option<&str>) -> Option<String> {
+    let exported = exported?;
+    if normalize_lang(exported) == normalize_lang(&target.content_lang) {
+        return None;
+    }
+    Some(format!(
+        "[fy-docs] language mismatch for [{}]: typst typesets `{exported}` but fy-docs reports \
+         `{}` — the entry's `lang:` and its language directory disagree: {}",
+        lang_label(target),
+        target.content_lang,
+        target.entry.display()
+    ))
 }
 
 /// Compiles the print-edition PDF 2.0 specifications into `docs/release/` in parallel.
@@ -541,8 +588,7 @@ fn ensure_landing_page(project: &Project, target: &Path) -> Result<()> {
 /// browser reloads never fall back to stale content.
 fn write_error_pages(project: &Project, targets: &[&LanguageTarget], raw_error: &str) {
     for target in targets {
-        if let Err(err) = write_error_page(project, raw_error, &target.html_file_name, &target.lang)
-        {
+        if let Err(err) = write_error_page(project, raw_error, target) {
             crate::state::log(&format!(
                 "[fy-docs] could not write error page {}: {err}",
                 target.html_file_name
@@ -551,16 +597,11 @@ fn write_error_pages(project: &Project, targets: &[&LanguageTarget], raw_error: 
     }
 }
 
-fn write_error_page(
-    project: &Project,
-    raw_error: &str,
-    file_name: &str,
-    lang_hint: &str,
-) -> Result<()> {
-    let target = &project.target_dir;
-    fs::create_dir_all(target)?;
+fn write_error_page(project: &Project, raw_error: &str, target: &LanguageTarget) -> Result<()> {
+    let dir = &project.target_dir;
+    fs::create_dir_all(dir)?;
 
-    let ui = crate::assets::ui_text(Some(lang_hint), raw_error);
+    let ui = crate::assets::ui_text(&target.content_lang);
     let escaped_error = crate::assets::escape(raw_error);
     let body = format!(
         r#"<div class="fy-error">
@@ -577,20 +618,20 @@ fn write_error_page(
         &project.name,
         project.repository.as_deref(),
         &body,
-        None,
+        target,
         &project.targets,
     );
 
-    write_atomic(&target.join(file_name), &page)?;
-    write_atomic(&target.join(SKIN_FILE), crate::assets::BASE_CSS)?;
-    write_atomic(&target.join(VIEWER_JS_FILE), crate::assets::VIEWER_JS)?;
+    write_atomic(&dir.join(&target.html_file_name), &page)?;
+    write_atomic(&dir.join(SKIN_FILE), crate::assets::BASE_CSS)?;
+    write_atomic(&dir.join(VIEWER_JS_FILE), crate::assets::VIEWER_JS)?;
     // Only seed typst.css when absent: in a partial failure the combined
     // styles of the successful targets are already on disk and must survive.
-    let typst_css = target.join(TYPST_CSS_FILE);
+    let typst_css = dir.join(TYPST_CSS_FILE);
     if !typst_css.exists() {
         write_atomic(&typst_css, "")?;
     }
-    write_atomic(&target.join(LIVE_JS_FILE), crate::assets::LIVE_JS)?;
+    write_atomic(&dir.join(LIVE_JS_FILE), crate::assets::LIVE_JS)?;
     Ok(())
 }
 
@@ -683,7 +724,7 @@ mod tests {
         fs::create_dir_all(temp.join("docs")).unwrap();
         let project = test_project(&temp.join("docs"));
 
-        write_error_page(&project, "boom <b>detail</b>", "index_zh-CN.html", "zh-CN").unwrap();
+        write_error_page(&project, "boom <b>detail</b>", &lang_target("zh-CN")).unwrap();
         let page = fs::read_to_string(temp.join("docs/target/index_zh-CN.html")).unwrap();
         assert!(page.contains("fy-error"));
         assert!(page.contains("boom &lt;b&gt;detail&lt;/b&gt;"));
@@ -705,7 +746,7 @@ mod tests {
         // A partial failure: the successful targets already wrote their
         // combined styles; the error page must not blank them out.
         fs::write(temp.join("docs/target/typst.css"), ".combined{color:teal}").unwrap();
-        write_error_page(&project, "boom", "index_en.html", "en").unwrap();
+        write_error_page(&project, "boom", &lang_target("en")).unwrap();
         assert_eq!(
             fs::read_to_string(temp.join("docs/target/typst.css")).unwrap(),
             ".combined{color:teal}"
@@ -714,7 +755,7 @@ mod tests {
         // With no styles on disk yet (everything failed) the error page
         // seeds an empty typst.css so the shell still loads.
         fs::remove_file(temp.join("docs/target/typst.css")).unwrap();
-        write_error_page(&project, "boom", "index_en.html", "en").unwrap();
+        write_error_page(&project, "boom", &lang_target("en")).unwrap();
         assert!(temp.join("docs/target/typst.css").is_file());
 
         let _ = fs::remove_dir_all(temp);
@@ -772,14 +813,15 @@ mod tests {
         let _ = fs::remove_dir_all(&temp);
         fs::create_dir_all(&temp).unwrap();
         let mut project = test_project(&temp);
-        let target = |lang: &str| LanguageTarget {
+        let selected_target = |lang: &str| LanguageTarget {
             lang: lang.to_owned(),
+            content_lang: lang.to_owned(),
             display_name: lang.to_owned(),
             entry: temp.join(format!("{lang}/main.typ")),
             html_file_name: format!("index_{lang}.html"),
             pdf_file_name: format!("test_{lang}.pdf"),
         };
-        project.targets = vec![target("zh-CN"), target("en")];
+        project.targets = vec![selected_target("zh-CN"), selected_target("en")];
 
         let err = select_targets(&project, Some("zz"))
             .unwrap_err()
@@ -822,6 +864,7 @@ mod tests {
     fn lang_target(lang: &str) -> LanguageTarget {
         LanguageTarget {
             lang: lang.to_owned(),
+            content_lang: lang.to_owned(),
             display_name: lang.to_owned(),
             entry: PathBuf::from(format!("docs/{lang}/main.typ")),
             html_file_name: format!("index_{lang}.html"),
@@ -857,6 +900,7 @@ mod tests {
         let mut default_project = test_project(&docs);
         default_project.targets = vec![LanguageTarget {
             lang: String::new(),
+            content_lang: "en".to_owned(),
             display_name: "Default".to_owned(),
             entry: docs.join("main.typ"),
             html_file_name: INDEX_FILE.to_owned(),
@@ -866,5 +910,45 @@ mod tests {
         assert!(!docs.join("target/index.html").exists());
 
         let _ = fs::remove_dir_all(temp);
+    }
+
+    #[test]
+    fn root_lang_comes_from_the_opening_tag_only() {
+        assert_eq!(
+            extract_root_lang(
+                r#"<!DOCTYPE html><html lang="zh-CN"><head><title>T</title></head><body><p>文</p></body></html>"#
+            )
+            .as_deref(),
+            Some("zh-CN")
+        );
+        // A lang attribute in the body is never the document language.
+        assert_eq!(
+            extract_root_lang(r#"<html lang="en"><body><p lang="zh">x</p></body></html>"#)
+                .as_deref(),
+            Some("en")
+        );
+        // `xml:lang` ends in the same name but is a different attribute.
+        assert_eq!(
+            extract_root_lang(r#"<html xml:lang="de" lang="fr">"#).as_deref(),
+            Some("fr")
+        );
+        assert_eq!(extract_root_lang("<html><body>x</body></html>"), None);
+        assert_eq!(extract_root_lang("<div>no root tag</div>"), None);
+    }
+
+    #[test]
+    fn drift_is_reported_only_for_a_real_divergence() {
+        let zh = lang_target("zh-CN");
+        let note = language_drift(&zh, Some("en")).expect("a divergence must warn");
+        assert!(
+            note.contains("typst typesets `en`") && note.contains("reports `zh-CN`"),
+            "{note}"
+        );
+
+        // Separator and case variants name the same tag, so they stay quiet.
+        assert!(language_drift(&zh, Some("ZH_CN")).is_none());
+        assert!(language_drift(&zh, Some("zh-CN")).is_none());
+        // An export without a root language offers nothing to compare.
+        assert!(language_drift(&zh, None).is_none());
     }
 }

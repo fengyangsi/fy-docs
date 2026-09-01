@@ -9,7 +9,15 @@ The `viewer` module powers the responsive reader interface and multi-language co
 ]
 
 #contract[
-  The root element's `lang` describes the *content* language: a named language target emits its normalized BCP 47 tag (`pt_BR` becomes `pt-BR`, base subtag lowercase, region uppercase, script title-cased), while a tagless default target is inferred from the body (`zh-CN` when it contains CJK ideographs, otherwise `en`). Toolbar chrome exists in English and Chinese only and `viewer.js` selects between them from the `lang` prefix, so content language and chrome language are independent axes: an untranslated language wears English chrome while its root tag still names it truthfully.
+  The root element's `lang` describes the *content* language: it carries the content tag the `project` module resolved for that target, in normalized BCP 47 shape (`pt_BR` becomes `pt-BR`, base subtag lowercase, region uppercase, script title-cased). That tag comes from declarations only and is never inferred from the glyphs in the body.
+]
+
+#contract[
+  Toolbar chrome exists in English and Chinese only: both the server-rendered template and `viewer.js` pick one set from the root `lang`'s `zh` prefix, so content language and chrome language are independent axes — an untranslated language wears English chrome while its root tag still names it truthfully.
+]
+
+#logic-box[
+  Label selection is a pure function, `ui_text(content_lang: &str) -> UiText`: the content language is its only input, never the body. After `normalize_lang`, a tag starting with `zh` selects the Chinese set and everything else (including the empty string) selects English. The page's `lang` attribute is `LanguageTarget.content_lang` — the same value handed to `ui_text`.
 ]
 
 #contract[

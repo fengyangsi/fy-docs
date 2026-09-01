@@ -18,7 +18,7 @@ const STARTER_MAIN: &str = r#"#import "fy-spec/lib.typ": *
   version: "{{VERSION}}",
   author: "{{AUTHOR}}",
   date: datetime.today().display("[year]-[month]-[day]"),
-  lang: "en", // change to "zh" or "zh-CN" for Chinese documents
+  lang: "en", // document language, e.g. "zh-CN": also the page's <html lang>
 )
 
 = Overview
