@@ -7,7 +7,7 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本遵循 [语义化版本 2.0.0](https://semver.org/lang/zh-CN/)。
 
-## [Unreleased]
+## [0.1.11] - 2026-09-01
 
 ### 新增
 - **发布包内含集成测试**：打包 `include` 列表加入 `/tests/**`，解包后的 `.crate` 得以保留它所声明的 dev-dependencies 对应的测试套件。
