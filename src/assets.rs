@@ -142,7 +142,7 @@ fn render_lang_menu(
             <path d="M2 12h20"/>
           </svg>
         </button>
-        <div id="fy-lang-menu" class="fy-theme-menu fy-lang-menu" role="menu" aria-label="{label}" hidden>
+        <div id="fy-lang-menu" class="fy-theme-menu" role="menu" aria-label="{label}" hidden>
           {items}
         </div>
       </div>"#

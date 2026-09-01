@@ -82,5 +82,9 @@ The `page` module assembles the reading page: it holds the markup shell, the chr
 ]
 
 #contract[
+  Because the bytes are embedded in the binary, an edit under `assets/` reaches a generated page only through a rebuilt crate: regenerating with an unchanged binary re-emits the old bytes, and the freshly written file is indistinguishable from a correct one. The dev watcher's watched set names `.typ` files exclusively, so no document edit refreshes an asset either. Assets are reload-free by design, and verifying an asset change requires recompiling first.
+]
+
+#contract[
   Error output is rendered through the same shell as a successful page, so a failed build still yields a styled, localized, navigable page rather than raw text: the diagnostic is escaped as element content and placed in the body slot, and the shell's chrome, language switcher, and asset links come from the same target as always.
 ]

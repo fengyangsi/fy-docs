@@ -93,7 +93,7 @@ pub(crate) fn write_error_page(
     let body = format!(
         r#"<div class="fy-error">
   <h1>{}</h1>
-  <p class="fy-error-lead">{}</p>
+  <p>{}</p>
   <pre><code>{}</code></pre>
   <p class="fy-error-hint">{}</p>
 </div>"#,

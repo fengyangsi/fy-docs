@@ -4,7 +4,7 @@
 
 `viewer` 章拥有三个文件——`assets/viewer.js`、`assets/base.css`、`assets/live.js`——它是唯一一章其代码绝不在 fy-docs 进程内运行。`page` 章把这三个文件内嵌为字符串常量，`compiler` 把它们写到每个生成页面的旁边，浏览器再从 `docs/target/` 加载它们。因此本章规定的是运行期行为，不是 Rust API。
 
-三个文件逐字节原样交付：仓库与浏览器之间没有任何打包器或转译器，审阅者读到的源码就是用户跑起来的产物。它们所绑定的外壳是 `assets/doc.html`，由 `page` 章规定；该外壳声明的 `id` 与 `class` 集合是内部不变量，因此 `viewer.js` 有权查询其中任何一项，而不必为元素缺失设防。
+三个文件逐字节原样交付：仓库与浏览器之间没有任何打包器或转译器，审阅者读到的源码就是用户跑起来的产物。它们所绑定的外壳是 `assets/doc.html`，由 `page` 章规定；该外壳声明的 `id` 与 `class` 集合是内部不变量，因此 `viewer.js` 有权查询其中任何一项，而不必为元素缺失设防。`tests/contract.rs` 校验使这条成立的方向：本章绑定的每个 `id` 与类名，都会与外壳及本 crate 界面标记所写出的名字比对；模板能产出的每个 callout kind 与 badge state，都会与样式表比对。
 
 #contract[
   `viewer.js` 在加载时重排文档：`#doc-body` 内每个顶层 `<h2>` 开启一个章节，首个标题之前的节点构成前置的封面章，typst 输出在正文里的 `nav[role="doc-toc"]` 被移出到侧栏。每章成为一个承载其节点的 `section.fy-chapter`，其锚点为首个节点的 `id`——该节点没有 `id` 时，前置章合成为 `cover`，其余合成为 `ch-<n>`。

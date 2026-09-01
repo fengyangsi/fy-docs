@@ -13,6 +13,7 @@
 - **发布包内含集成测试**：打包 `include` 列表加入 `/tests/**`，解包后的 `.crate` 得以保留它所声明的 dev-dependencies 对应的测试套件。
 - **语言命名规则成文**：语言目录仅当地区或文字子标签承载真实差异时才追加子标签，`en` 保持中性英文根语言，严禁为拼写差异分叉整份文档。
 - **语言分歧告警**：当 typst HTML 导出的排版语言与 fy-docs 为该目标解析出的内容语言不一致时，构建在 stderr 输出一行，同时列出两个标签与入口路径。该项仅作诊断：页面使用的仍是解析出的标签，退出码不变。
+- **页面表面由静态扫描把守**：`tests/contract.rs` 读取页面 `id` 与 `class` 表面的四个写出方——外壳、本 crate 的界面标记、展开到模板所能拼接的每个 callout kind 与 badge state 的 fy-spec 模板、以及 `viewer.js` 在运行期赋予的类——与两个读取方（`base.css` 和 `viewer.js` 匹配的选择器）彼此比对，并另外校验 `viewer.js` 绑定的每个 `id` 都确有产出方。不启浏览器、不调 typst、不加依赖：扫描的是纯文本。
 
 ### 变更
 - **内容语言只来自声明，不再推断**：每个语言目标解析出唯一标签——语言目录名 → 入口 `main.typ` 的 `lang:` 实参 → fy-spec 模板默认 `en`——并由它同时决定 `<html lang>` 与顶栏文案套别。正文不再被扫描 CJK 字形，因此未声明的中文文档行为改变：根 `docs/main.typ` 缺少 `lang:` 时得到英文 chrome，需在该 `#show: project_book.with(...)` 调用中写明 `lang: "zh-CN"`。换来的是日文文档不再因共用表意文字被标成 `zh-CN`，同一份文档也不会再对浏览器与 PDF 各报一种语言。
@@ -22,12 +23,15 @@
 - **内部重构，行为不变**：`compiler` 与 `project` 拆分为单一职责的子模块（`compiler/{mod,typst,extract,warnings,output}`、`project/{mod,lang,cargo_meta,imports,template_args}`），终端输出从 `state.rs` 迁入 `term.rs`。启动选项只捕获一次，此后的每一次生成——包括 dev 模式重建——都读取捕获的同一份；默认命令与 `build` 在捕获时即把 PDF 恒置为开启，不再在某一个分发臂里硬编码。`dispatch` 经返回值传递退出码，取代函数中部的 `process::exit`；一次 typst HTML 导出以具名的 `ExtractedPage` 承载，取代裸的三元字符串组；`SKIN_FILE`/`warnings_note` 更名 `STYLE_FILE`/`format_warnings`。命令、旗标、输出文件名与退出码全部不变；测试随函数迁移，所有测试草稿目录统一为 RAII 的 `TempDir`。
 - **规格结构与模块划分对齐**：`docs/` 现为七章——`cli`、`scaffold`、`project`、`compiler`、`page`、`server`、`viewer`——其中 `scaffold`（`init` 与 `vendor` 的设计）和 `page`（`src/assets.rs` 加 `assets/doc.html`）此前没有自己的章节，其契约散记在 `cli` 与 `compiler` 章内。`main.typ` 新增实现文件到章节的归属表，写明箭头由产出方指向消费其产物的一方、表达的是消费分层而非 Rust 的 `use` 图，并把生成外壳的 `id` 与 `class` 集合钉为内部不变量——`viewer.js` 有权直接绑定，无需为元素缺失设防。首次成文的还有：固定分发顺序、二十个候选端口的分配范围、错误到退出码的路径、`/events` 的首帧基线、监听集合及其只认 `.typ` 的规则、共享的忽略规则辅助函数、`typst.css` 的包含即相等合并，以及资产字节归 `page`、资产文件名归 `compiler` 的分工。本次未改任何代码。
 - **宽屏把宽度让给会溢出的材料**：文档列此前与视口无关地固定为 820 px，于是一行长代码在自己的盒子里横向滚动，带鱼屏两侧却空空如也。自 1280 px 视口起页面放宽到 1180 px，自 1800 px 起放宽到 1440 px，而正文、标题与提示框仍钉在同一个 756 px 测量长度上；只有代码块、figure 与导出 SVG 拿走新增的宽度。
+- **样式表为每一种会被要求的 kind 命名**：`base.css` 现在为模板所能产出的全部十种 callout kind 各备一条 accent 规则。其中七种叙述类 kind 取到的正是 `fy-box` 此前已经交给它们的值，因此没有任何页面重绘；改变的是新增 kind 再不可能无声地不带样式到场——`fy-spec` 章早已把这种情况称为缺陷而非偏好。
+- **类名契约的措辞与扫描对齐**：`fy-spec` 的不变量改为点名表面的全部写出方与全部读取方，不再只谈模板与样式表两者；`viewer` 章记下它的绑定集合会对照外壳所产出者校验；`page` 章写明编译期内嵌的后果——`assets/` 下的改动只能经重新构建的二进制抵达页面，而只认 `.typ` 的 dev 监听集合永远不会刷新它。
 
 ### 修复
 - **页面正文语言标注**：根元素 `lang` 取自顶栏 chrome 语言，而 chrome 文案仅有中英两套，导致其余语言被读屏器与 `:lang()` 断字当作英文。现在页面标注自身规范化的语言标签，chrome 仍回退为英文。
 - **侧栏高亮跟随读者**：被标记的条目此前只有当前章自己的锚点，于是从 `3.1` 读到 `3.2`、`3.3` 时始终只有「3」亮着，其下的小节连直接点击都不点亮。现在内容面板顶端的标题挂 `fy-toc-active`、其所属章保持 `fy-toc-chapter-active`；篇幅太短、永远到不了顶边的小节，在面板滚到末尾时同样会被点亮。
 
 ### 移除
+- **死掉的样式重量与两个死钩子**：`base.css` 里还留着已退役的索引页——`.fy-index`、`.fy-index-head`、`.fy-brand`、`.fy-sub`、`.fy-doc-list`、`.fy-card*`、`.doc-link`、`.doc-name`、`.doc-title`、`.doc-status`、`.fy-theme-select`——而路由落地页只发内联样式，根本不带任何 `class` 属性。另外删掉两个由标记写出却无人读取的类：`fy-lang-menu`（该元素由共用的 `fy-theme-menu` 规则定位，并按 `id` 被取用）与 `fy-error-lead`。
 - `docs/target/` 清扫不再删除 `_poll.js` 与 `_build`：当前构建根本不产出这两个文件，保留名单等于让工具背负自己的升级史，且每次发版只会拉长它。被强制中断的编译所遗留的 `_temp_*.html` 中间文件仍会清理。
 
 ## [0.1.10] - 2026-08-31

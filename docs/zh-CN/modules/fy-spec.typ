@@ -48,5 +48,5 @@ HTML 阅读器样式表（`assets/base.css`）*只*依赖下表列出的类名�
 ]
 
 #invariant[
-  类名面是双向契约：本库产出的每个 `fy-*` 类都必须在 `assets/base.css` 中有规则，`base.css` 也不得为没有任何产出方的 `fy-*` 类书写样式。任一侧改名都必须在同一提交内同步另一侧；各项目通过 CI 中的 `cargo fy-docs vendor --check` 锁定本模板版本。
+  类名面是所有写出方与所有读取方之间的契约，而不只是本库与样式表之间的事。它的写出方是 `assets/doc.html`、本 crate 构建的界面标记、`lib.typ` 发出的类，以及 `assets/viewer.js` 在运行期赋予的类；读取方是 `assets/base.css` 与 `viewer.js` 所匹配的选择器。没有任何写出方产出的类是死掉的样式重量，没有任何读取方消费的类是死掉的钩子。`tests/contract.rs` 对两个方向都作断言，因此单侧改名会在同一个提交里让测试套件失败，而不是悄悄让某个表面失去样式；`cargo fy-docs vendor --check` 则把各项目锁定在这段扫描所读取的模板版本上。
 ]

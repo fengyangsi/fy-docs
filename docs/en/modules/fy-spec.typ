@@ -48,5 +48,5 @@ The HTML viewer stylesheet (`assets/base.css`) relies *only* on the classes belo
 ]
 
 #invariant[
-  The class surface is a two-way contract: every `fy-*` class this library emits must carry rules in `assets/base.css`, and `base.css` must not style an `fy-*` class that nothing emits. Any rename on either side is matched in the other file within the same commit, and projects stay pinned to this template version via `cargo fy-docs vendor --check` in CI.
+  The class surface is a contract between every writer and every reader, not just between this library and the stylesheet. Its writers are `assets/doc.html`, the chrome markup this crate builds, the classes `lib.typ` emits, and the classes `assets/viewer.js` assigns at runtime; its readers are `assets/base.css` and the selectors `viewer.js` matches. A class no writer produces is dead stylesheet weight, a class no reader consumes is a dead hook. `tests/contract.rs` asserts both directions, so a rename on one side fails the suite in the same commit instead of silently unstyling a surface, and `cargo fy-docs vendor --check` keeps every project pinned to the template that scan reads.
 ]

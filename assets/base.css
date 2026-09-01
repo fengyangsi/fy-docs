@@ -134,82 +134,6 @@ body {
   line-height: 1.75;
 }
 
-/* ---- index page ---------------------------------------------------------- */
-
-.fy-index {
-  max-width: 42rem;
-  margin: 0 auto;
-  width: 100%;
-  padding: 10vh 24px 64px;
-}
-
-.fy-index-head {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-  margin-bottom: 28px;
-}
-
-.fy-brand {
-  font-family: "Source Code Pro", "Cascadia Code", Consolas, monospace;
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: var(--heading);
-  text-decoration: none;
-}
-
-.fy-sub { color: var(--muted); }
-
-.fy-doc-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.doc-link,
-.fy-card {
-  display: flex;
-  align-items: baseline;
-  gap: 14px;
-  padding: 16px 20px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  text-decoration: none;
-  color: inherit;
-  transition: border-color 0.15s ease;
-}
-.doc-link:hover,
-.fy-card:hover { border-color: var(--links); }
-
-.doc-name,
-.fy-card-name {
-  font-family: "Source Code Pro", "Cascadia Code", Consolas, monospace;
-  font-weight: 700;
-  color: var(--heading);
-}
-
-.doc-title,
-.fy-card-title {
-  flex: 1;
-  color: var(--muted);
-  font-size: 0.9em;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.doc-status,
-.fy-card-state {
-  font-size: 0.75rem;
-  font-family: "Source Code Pro", Consolas, monospace;
-}
-.doc-status.ok, .fy-card-state.ok { color: var(--accent-tip); }
-.doc-status.failed, .fy-card-state.failed { color: var(--error); }
-
 /* ---- viewer shell --------------------------------------------------------- */
 
 .fy-shell { min-height: 100vh; display: flex; flex-direction: column; }
@@ -630,6 +554,17 @@ body {
 .fy-box.fy-invariant { --box-accent: var(--accent-warning); }
 .fy-box.fy-example { --box-accent: var(--accent-important); }
 
+/* Names the kinds that share one exposition accent instead of leaving them to
+   the .fy-box default, so no emitted kind is unstyled. Print matches: there
+   those wrappers inherit palette.note by omitting accent, fill and stroke. */
+.fy-box.fy-note,
+.fy-box.fy-logic,
+.fy-box.fy-proof,
+.fy-box.fy-math,
+.fy-box.fy-geom,
+.fy-box.fy-axiom,
+.fy-box.fy-motion { --box-accent: var(--accent-note); }
+
 .fy-box-title {
   display: block;
   font-family: "Noto Sans SC", "Microsoft YaHei", sans-serif;
@@ -785,9 +720,6 @@ body {
   word-break: break-word;
 }
 .fy-error-hint { color: var(--muted); font-size: 0.9em; }
-
-.fy-index-head .flex-1 { flex: 1; }
-.fy-index-head .fy-theme-select { flex-shrink: 0; }
 
 /* ---- SVG diagrams auto-theme & link interactions -------------------------- */
 
