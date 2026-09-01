@@ -159,7 +159,9 @@ async fn dispatch(cli: Cli, cwd: &Path) -> Result<ExitCode> {
                     crate::term::display_path(path)
                 ));
             }
-            if cli.open && let Some(first) = paths.first() {
+            if cli.open
+                && let Some(first) = paths.first()
+            {
                 let _ = open::that_detached(first);
             }
         }

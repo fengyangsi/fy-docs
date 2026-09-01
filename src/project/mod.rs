@@ -9,10 +9,10 @@ mod template_args;
 pub(crate) use cargo_meta::cargo_package_meta;
 pub(crate) use lang::{LanguageTarget, lang_display_name, normalize_lang};
 
-use imports::{absolute_imports, detect_root};
-use template_args::main_typ_version;
 use anyhow::{Context, Result, bail};
+use imports::{absolute_imports, detect_root};
 use std::path::{Path, PathBuf};
+use template_args::main_typ_version;
 
 /// A documentation project: `<cwd>/docs/` plus everything needed to compile,
 /// build, and serve single or multi-language specifications.
@@ -196,11 +196,7 @@ fn detect_language_targets(
                 let version = resolve_version(version_hint, &sub_main);
                 let display = lang_display_name(&dir_name);
                 sub_targets.push(LanguageTarget::new(
-                    &dir_name,
-                    &display,
-                    sub_main,
-                    pkg_name,
-                    &version,
+                    &dir_name, &display, sub_main, pkg_name, &version,
                 ));
             }
         }

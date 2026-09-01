@@ -95,7 +95,11 @@ pub(crate) fn compile_html_target(
             extract_between(&html, "<title>", "</title>").unwrap_or_else(|| project.name.clone());
         let styles = extract_all_styles(&html);
         let body = extract_body(&html).context("typst HTML export contains no <body>")?;
-        Ok(ExtractedPage { title, styles, body })
+        Ok(ExtractedPage {
+            title,
+            styles,
+            body,
+        })
     })();
     let _ = fs::remove_file(&temp_html);
     parts

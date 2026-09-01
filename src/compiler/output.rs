@@ -164,7 +164,11 @@ mod tests {
 
         // A partial failure: the successful targets already wrote their
         // combined styles; the error page must not blank them out.
-        fs::write(project.target_dir.join("typst.css"), ".combined{color:teal}").unwrap();
+        fs::write(
+            project.target_dir.join("typst.css"),
+            ".combined{color:teal}",
+        )
+        .unwrap();
         write_error_page(&project, "boom", &lang_target("en")).unwrap();
         assert_eq!(
             fs::read_to_string(project.target_dir.join("typst.css")).unwrap(),
