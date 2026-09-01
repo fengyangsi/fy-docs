@@ -4,12 +4,14 @@ mod project;
 mod scaffold;
 mod server;
 mod state;
+mod term;
 mod watcher;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
+use std::process::ExitCode;
 use std::sync::Arc;
 
 use crate::state::AppState;
@@ -75,32 +77,59 @@ enum Command {
 }
 
 #[tokio::main]
-async fn main() -> Result<()> {
+async fn main() -> ExitCode {
     let cli = Cli::parse_from(cargo_external_args(std::env::args_os()));
-    let cwd = crate::project::clean_canonicalize(&std::env::current_dir()?)?;
-    dispatch(cli, &cwd).await
+    let dir = match std::env::current_dir() {
+        Ok(dir) => dir,
+        Err(err) => {
+            crate::term::log(&format!(
+                "[fy-docs] could not read the current directory: {err}"
+            ));
+            return ExitCode::FAILURE;
+        }
+    };
+    let cwd = match crate::project::clean_canonicalize(&dir) {
+        Ok(cwd) => cwd,
+        Err(err) => {
+            crate::term::log(&format!("[fy-docs] {err:#}"));
+            return ExitCode::FAILURE;
+        }
+    };
+    match dispatch(cli, &cwd).await {
+        Ok(code) => code,
+        Err(err) => {
+            crate::term::log(&format!("[fy-docs] {err:#}"));
+            ExitCode::FAILURE
+        }
+    }
 }
 
-async fn dispatch(cli: Cli, cwd: &Path) -> Result<()> {
+async fn dispatch(cli: Cli, cwd: &Path) -> Result<ExitCode> {
     // Init does not require an existing docs/ directory.
     if matches!(cli.command, Some(Command::Init)) {
-        return scaffold::init(cwd);
+        return scaffold::init(cwd).map(|()| ExitCode::SUCCESS);
     }
 
     // Vendor only copies the embedded template; it needs no typst binary.
     if let Some(Command::Vendor { check }) = cli.command {
-        return scaffold::vendor(cwd, check);
+        return scaffold::vendor(cwd, check).map(|()| ExitCode::SUCCESS);
     }
 
     // Every remaining command compiles, so fail fast on a missing or old typst.
     compiler::precheck()?;
 
     let project = project::detect(cwd, cli.root.as_deref())?;
-    // Capture the CLI options so dev-mode rebuilds repeat the same generation.
+    // Capture the CLI options once so every generation — including each
+    // dev-mode rebuild — repeats them. The default command and `build` always
+    // compile PDFs; `html` and `dev` follow the flag.
+    let with_pdf = match cli.command {
+        None | Some(Command::Build) => true,
+        _ => cli.with_pdf,
+    };
     let state = Arc::new(AppState::with_generate(
         project,
         state::GenerateOptions {
-            with_pdf: cli.with_pdf,
+            with_pdf,
             lang_filter: cli.lang.clone(),
         },
     ));
@@ -108,30 +137,13 @@ async fn dispatch(cli: Cli, cwd: &Path) -> Result<()> {
     match cli.command {
         // Init and Vendor returned before project detection and precheck.
         Some(Command::Init | Command::Vendor { .. }) => unreachable!(),
-        None | Some(Command::Build) => {
-            // Default: Full build of both HTML and PDF
-            let ok = compiler::generate_into(&state, true, cli.lang.as_deref());
-            if !ok {
-                std::process::exit(1);
+        None | Some(Command::Build | Command::Html) => {
+            if compiler::generate(&state).is_err() {
+                return Ok(ExitCode::FAILURE);
             }
-            state::log(&format!(
+            crate::term::log(&format!(
                 "[fy-docs] generated {}",
-                state::display_path(&state.project.target_dir)
-            ));
-            if cli.open {
-                let index_path = state.project.target_dir.join(compiler::INDEX_FILE);
-                let _ = open::that_detached(index_path);
-            }
-        }
-        Some(Command::Html) => {
-            // HTML only (or with PDF if explicitly asked)
-            let ok = compiler::generate_into(&state, cli.with_pdf, cli.lang.as_deref());
-            if !ok {
-                std::process::exit(1);
-            }
-            state::log(&format!(
-                "[fy-docs] HTML generated in {}",
-                state::display_path(&state.project.target_dir)
+                crate::term::display_path(&state.project.target_dir)
             ));
             if cli.open {
                 let index_path = state.project.target_dir.join(compiler::INDEX_FILE);
@@ -142,29 +154,28 @@ async fn dispatch(cli: Cli, cwd: &Path) -> Result<()> {
             // PDF 2.0 specifications only
             let paths = compiler::compile_pdf(&state.project, cli.lang.as_deref())?;
             for path in &paths {
-                state::log(&format!(
+                crate::term::log(&format!(
                     "[fy-docs] PDF written to {}",
-                    state::display_path(path)
+                    crate::term::display_path(path)
                 ));
             }
-            if cli.open {
-                if let Some(first) = paths.first() {
-                    let _ = open::that_detached(first);
-                }
+            if cli.open && let Some(first) = paths.first() {
+                let _ = open::that_detached(first);
             }
         }
         Some(Command::Dev) | Some(Command::Serve) => {
-            // Dev mode: live server + watcher
-            compiler::generate_into(&state, cli.with_pdf, cli.lang.as_deref());
+            // Dev mode: live server + watcher. A failing first build still
+            // starts the server, whose error pages the browser then shows.
+            let _ = compiler::generate(&state);
             watcher::spawn(state.clone())?;
 
             let app = server::router(&state);
             let listener = bind(cli.port).await?;
             let url = format!("http://{}", listener.local_addr()?);
-            state::log(&format!("[fy-docs] serving at {url}"));
+            crate::term::log(&format!("[fy-docs] serving at {url}"));
             if !cli.no_open {
                 if let Err(err) = open::that_detached(&url) {
-                    state::log(&format!(
+                    crate::term::log(&format!(
                         "[fy-docs] could not open a browser ({err}); open {url} manually"
                     ));
                 }
@@ -172,12 +183,12 @@ async fn dispatch(cli: Cli, cwd: &Path) -> Result<()> {
             axum::serve(listener, app)
                 .with_graceful_shutdown(async {
                     let _ = tokio::signal::ctrl_c().await;
-                    state::log("[fy-docs] shutting down");
+                    crate::term::log("[fy-docs] shutting down");
                 })
                 .await?;
         }
     }
-    Ok(())
+    Ok(ExitCode::SUCCESS)
 }
 
 /// Cargo invokes external commands as `cargo-<name> <name> ...`; remove the
@@ -274,33 +285,33 @@ mod tests {
             eprintln!("skipping: typst is not on PATH");
             return;
         }
-        let temp = std::env::temp_dir().join(format!("fy-docs-main-run-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&temp);
-        std::fs::create_dir_all(&temp).unwrap();
-        let clean_temp = crate::project::clean_canonicalize(&temp).unwrap();
+        let temp = tempfile::tempdir().unwrap();
+        let clean_temp = crate::project::clean_canonicalize(temp.path()).unwrap();
 
         // 1. init
         let init_cli = Cli::parse_from(["cargo-fy-docs", "init"]);
-        dispatch(init_cli, &clean_temp).await.unwrap();
+        let code = dispatch(init_cli, &clean_temp).await.unwrap();
+        assert_eq!(code, ExitCode::SUCCESS);
         assert!(clean_temp.join("docs/main.typ").is_file());
         assert!(clean_temp.join("docs/fy-spec/lib.typ").is_file());
 
         // 2. build (HTML + PDF)
         let build_cli = Cli::parse_from(["cargo-fy-docs", "build"]);
-        dispatch(build_cli, &clean_temp).await.unwrap();
+        let code = dispatch(build_cli, &clean_temp).await.unwrap();
+        assert_eq!(code, ExitCode::SUCCESS);
         assert!(clean_temp.join("docs/target/index.html").is_file());
         assert!(clean_temp.join("docs/target/fy-docs.css").is_file());
         assert!(clean_temp.join("docs/release").is_dir());
 
         // 3. html only
         let html_cli = Cli::parse_from(["cargo-fy-docs", "html"]);
-        dispatch(html_cli, &clean_temp).await.unwrap();
+        let code = dispatch(html_cli, &clean_temp).await.unwrap();
+        assert_eq!(code, ExitCode::SUCCESS);
         assert!(clean_temp.join("docs/target/index.html").is_file());
 
         // 4. pdf only
         let pdf_cli = Cli::parse_from(["cargo-fy-docs", "pdf"]);
-        dispatch(pdf_cli, &clean_temp).await.unwrap();
-
-        let _ = std::fs::remove_dir_all(&temp);
+        let code = dispatch(pdf_cli, &clean_temp).await.unwrap();
+        assert_eq!(code, ExitCode::SUCCESS);
     }
 }

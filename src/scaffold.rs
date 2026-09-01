@@ -39,7 +39,7 @@ pub(crate) fn init(cwd: &Path) -> Result<()> {
     if entry.is_file() {
         bail!(
             "`{}` already exists — remove it first if you want to re-initialize",
-            crate::state::display_path(&entry)
+            crate::term::display_path(&entry)
         );
     }
 
@@ -70,14 +70,14 @@ pub(crate) fn init(cwd: &Path) -> Result<()> {
     // Ensure .gitignore has the generated directories.
     crate::project::ensure_gitignore(cwd, &["/docs/target/", "/docs/release/"]);
 
-    crate::state::log(&format!(
+    crate::term::log(&format!(
         "[fy-docs] initialized {}",
-        crate::state::display_path(&docs_dir)
+        crate::term::display_path(&docs_dir)
     ));
-    crate::state::log("[fy-docs] created docs/main.typ");
-    crate::state::log("[fy-docs] created docs/fy-spec/lib.typ");
-    crate::state::log("[fy-docs] created docs/modules/");
-    crate::state::log("[fy-docs] → run `cargo fy-docs` to preview");
+    crate::term::log("[fy-docs] created docs/main.typ");
+    crate::term::log("[fy-docs] created docs/fy-spec/lib.typ");
+    crate::term::log("[fy-docs] created docs/modules/");
+    crate::term::log("[fy-docs] → run `cargo fy-docs` to preview");
     Ok(())
 }
 
@@ -89,7 +89,7 @@ pub(crate) fn vendor(cwd: &Path, check: bool) -> Result<()> {
     if !docs_dir.is_dir() {
         bail!(
             "`{}` has no docs/ directory — run `cargo fy-docs init` first",
-            crate::state::display_path(&docs_dir)
+            crate::term::display_path(&docs_dir)
         );
     }
     let lib = docs_dir.join("fy-spec").join("lib.typ");
@@ -98,27 +98,27 @@ pub(crate) fn vendor(cwd: &Path, check: bool) -> Result<()> {
         let current = fs::read_to_string(&lib).with_context(|| {
             format!(
                 "{} is missing — run `cargo fy-docs vendor` to sync it",
-                crate::state::display_path(&lib)
+                crate::term::display_path(&lib)
             )
         })?;
         if current != TEMPLATE_LIB {
             bail!(
                 "{} differs from the embedded template — run `cargo fy-docs vendor` to sync it",
-                crate::state::display_path(&lib)
+                crate::term::display_path(&lib)
             );
         }
-        crate::state::log(&format!(
+        crate::term::log(&format!(
             "[fy-docs] {} matches the embedded template",
-            crate::state::display_path(&lib)
+            crate::term::display_path(&lib)
         ));
         return Ok(());
     }
 
     fs::create_dir_all(docs_dir.join("fy-spec")).context("could not create docs/fy-spec/")?;
     fs::write(&lib, TEMPLATE_LIB).context("could not write docs/fy-spec/lib.typ")?;
-    crate::state::log(&format!(
+    crate::term::log(&format!(
         "[fy-docs] vendored fy-spec into {}",
-        crate::state::display_path(&lib)
+        crate::term::display_path(&lib)
     ));
     Ok(())
 }
@@ -129,83 +129,70 @@ mod tests {
 
     #[test]
     fn scaffolds_docs_directory() {
-        let temp = std::env::temp_dir().join(format!("fy-docs-init-{}", std::process::id()));
-        std::fs::create_dir_all(&temp).unwrap();
+        let temp = tempfile::tempdir().unwrap();
         std::fs::write(
-            temp.join("Cargo.toml"),
+            temp.path().join("Cargo.toml"),
             "[package]\nname = \"test-project\"\nversion = \"1.0.0\"\nauthors = [\"Tester <t@example.com>\"]\n",
         )
         .unwrap();
 
-        init(&temp).unwrap();
+        init(temp.path()).unwrap();
 
-        assert!(temp.join("docs/main.typ").is_file());
-        assert!(temp.join("docs/fy-spec/lib.typ").is_file());
-        assert!(temp.join("docs/modules").is_dir());
+        assert!(temp.path().join("docs/main.typ").is_file());
+        assert!(temp.path().join("docs/fy-spec/lib.typ").is_file());
+        assert!(temp.path().join("docs/modules").is_dir());
 
-        let main = std::fs::read_to_string(temp.join("docs/main.typ")).unwrap();
+        let main = std::fs::read_to_string(temp.path().join("docs/main.typ")).unwrap();
         assert!(main.contains("test-project"));
         assert!(main.contains("1.0.0"));
         assert!(main.contains("Tester"));
         assert!(!main.contains("fengyangsi"));
-
-        std::fs::remove_dir_all(temp).unwrap();
     }
 
     #[test]
     fn refuses_to_overwrite_existing_main() {
-        let temp = std::env::temp_dir().join(format!("fy-docs-init-dup-{}", std::process::id()));
-        std::fs::create_dir_all(temp.join("docs")).unwrap();
-        std::fs::write(temp.join("docs/main.typ"), "existing").unwrap();
+        let temp = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(temp.path().join("docs")).unwrap();
+        std::fs::write(temp.path().join("docs/main.typ"), "existing").unwrap();
 
-        let result = init(&temp);
+        let result = init(temp.path());
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("already exists"));
-
-        std::fs::remove_dir_all(temp).unwrap();
     }
 
     #[test]
     fn falls_back_without_cargo_toml() {
-        let temp =
-            std::env::temp_dir().join(format!("fy-docs-init-no-cargo-{}", std::process::id()));
-        std::fs::create_dir_all(&temp).unwrap();
+        let temp = tempfile::tempdir().unwrap();
 
-        init(&temp).unwrap();
+        init(temp.path()).unwrap();
 
-        let main = std::fs::read_to_string(temp.join("docs/main.typ")).unwrap();
+        let main = std::fs::read_to_string(temp.path().join("docs/main.typ")).unwrap();
         assert!(main.contains("0.1.0"));
         assert!(main.contains(r#"author: "TODO""#));
-
-        std::fs::remove_dir_all(temp).unwrap();
     }
 
     #[test]
     fn vendor_syncs_and_checks_the_template() {
-        let temp = std::env::temp_dir().join(format!("fy-docs-vendor-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&temp);
-        std::fs::create_dir_all(&temp).unwrap();
+        let temp = tempfile::tempdir().unwrap();
 
         // Without a docs/ directory vendor refuses and points at init.
-        assert!(vendor(&temp, false).is_err());
+        assert!(vendor(temp.path(), false).is_err());
 
-        init(&temp).unwrap();
-        assert!(vendor(&temp, true).is_ok());
+        init(temp.path()).unwrap();
+        assert!(vendor(temp.path(), true).is_ok());
 
         // A drifted or missing copy fails --check and is repaired by vendor.
-        std::fs::write(temp.join("docs/fy-spec/lib.typ"), "drifted").unwrap();
-        assert!(vendor(&temp, true).is_err());
-        vendor(&temp, false).unwrap();
-        assert!(vendor(&temp, true).is_ok());
+        std::fs::write(temp.path().join("docs/fy-spec/lib.typ"), "drifted").unwrap();
+        assert!(vendor(temp.path(), true).is_err());
+        vendor(temp.path(), false).unwrap();
+        assert!(vendor(temp.path(), true).is_ok());
 
-        std::fs::remove_file(temp.join("docs/fy-spec/lib.typ")).unwrap();
-        assert!(vendor(&temp, true).is_err());
-        vendor(&temp, false).unwrap();
+        std::fs::remove_file(temp.path().join("docs/fy-spec/lib.typ")).unwrap();
+        assert!(vendor(temp.path(), true).is_err());
+        vendor(temp.path(), false).unwrap();
         assert_eq!(
-            std::fs::read_to_string(temp.join("docs/fy-spec/lib.typ")).unwrap(),
+            std::fs::read_to_string(temp.path().join("docs/fy-spec/lib.typ")).unwrap(),
             TEMPLATE_LIB
         );
-
-        std::fs::remove_dir_all(temp).unwrap();
     }
 }

@@ -75,3 +75,34 @@ docs/
 #invariant[
   Typst 沙盒根目录（`root`）自动探测能覆盖全部绝对导入的最接近祖先目录；用户亦可通过 `--root <DIR>` 显式锁定。
 ]
+
+#contract[
+  `Project` 携带监听集合：先是 `docs/` 目录，随后是每个指向根内目录的绝对导入所命名的顶层目录，按发现顺序去重。该派生位于本章，因为只有探测阶段知道一次构建会牵入哪些本地包；`server` 章的 watcher 只是递归监听这一份清单，不自行增添任何目录。
+]
+
+#contract[
+  `ensure_gitignore(root, entries)` 是 `project` 模块唯一的共享忽略规则辅助函数，`scaffold` 以两个生成目录调用它，`compiler` 以 HTML 目录调用它。它按文本读取文件，某行去除首尾空白后与条目相等即视为已存在，只追加缺失的条目并在追加前补回缺失的行末换行，且只在确有新增时重写文件。已有行绝不重排、改写或删除，因此拼写不同的等价模式会成为多出一行，而非命中。写不进的 `.gitignore` 只记录并忽略：任何命令的退出码都不依赖它。
+]
+
+== 模块结构
+
+`project` 模块按职责拆分为 `src/project/` 下的五个文件：
+
+#figure(
+  table(
+    columns: (auto, auto),
+    inset: 6pt,
+    align: (auto, left),
+    table.header([*文件*], [*职责*]),
+    [`mod.rs`], [`Project` 类型、`detect`、语言目标扫描、`--lang` 选择，以及共享路径辅助（`clean_canonicalize`、`ensure_gitignore`）],
+    [`lang.rs`], [`LanguageTarget` 与语言工具集：`normalize_lang`、`format_lang`、`lang_display_name`、`resolve_content_lang`。所有目标经由唯一构造函数构建，输出文件命名规则只存在于一处],
+    [`cargo_meta.rs`], [`Cargo.toml` 读取，含 `workspace = true` 继承],
+    [`imports.rs`], [绝对导入扫描与 Typst root 探测],
+    [`template_args.rs`], [共享模板实参解析器及其 `version:` / `lang:` 读取器],
+  ),
+  caption: [project 模块的内部布局。],
+)
+
+#contract[
+  目标版本由单一位置按序解析：清单版本（已含 workspace 继承），否则入口 `main.typ` 的 `version:` 实参，否则 `0.1.0`。同一解析结果就是发行版 PDF 文件名中内嵌的版本。
+]

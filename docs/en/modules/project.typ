@@ -75,3 +75,34 @@ docs/
 #invariant[
   Typst root sandbox (`root`) automatically defaults to the nearest ancestor satisfying all absolute imports, overridable via `--root <DIR>`.
 ]
+
+#contract[
+  `Project` carries the watch set: the `docs/` directory first, then the top-level directory named by each absolute import that resolves to a directory inside the root, deduplicated in discovery order. The derivation lives here because only detection knows which local packages a build pulls in; the watcher of the `server` chapter recursively watches exactly this list and adds nothing of its own.
+]
+
+#contract[
+  `ensure_gitignore(root, entries)` is the project module's single shared ignore-rule helper, called by `scaffold` with both generated directories and by `compiler` with the HTML one. It reads the file as text, treats an entry as present when some line equals it after trimming, appends only the missing entries after restoring a missing final newline, and rewrites the file only when something was added. An existing line is never reordered, rewritten or removed, and a differently spelled equivalent pattern therefore becomes an additional line rather than a match. An unwritable `.gitignore` is logged and ignored: no command's exit code depends on it.
+]
+
+== Module Structure
+
+The module splits by concern into five files under `src/project/`:
+
+#figure(
+  table(
+    columns: (auto, auto),
+    inset: 6pt,
+    align: (auto, left),
+    table.header([*File*], [*Concern*]),
+    [`mod.rs`], [The `Project` type, `detect`, the language-target scan, `--lang` selection, and the shared path helpers (`clean_canonicalize`, `ensure_gitignore`)],
+    [`lang.rs`], [`LanguageTarget` and the language toolkit: `normalize_lang`, `format_lang`, `lang_display_name`, `resolve_content_lang`. Every target is built through one constructor, so the output file naming rules live in exactly one place],
+    [`cargo_meta.rs`], [`Cargo.toml` reading, including `workspace = true` inheritance],
+    [`imports.rs`], [The absolute-import scan and typst root detection],
+    [`template_args.rs`], [The shared template-argument parser and its `version:` / `lang:` readers],
+  ),
+  caption: [The project module's internal layout.],
+)
+
+#contract[
+  A target's version resolves in one place, in order: the manifest version (already honoring workspace inheritance), else the entry's `version:` argument, else `0.1.0`. The same resolved version is what the target's release PDF file name embeds.
+]

@@ -41,19 +41,8 @@ mod tests {
 
     #[tokio::test]
     async fn events_endpoint_streams_baseline_then_rebuilds() {
-        let temp = std::env::temp_dir().join(format!("fy-docs-server-test-{}", std::process::id()));
-        std::fs::create_dir_all(&temp).unwrap();
-        let project = Project {
-            name: "test".to_owned(),
-            version: "0.1.0".to_owned(),
-            repository: None,
-            targets: Vec::new(),
-            docs_dir: temp.clone(),
-            root: temp.clone(),
-            target_dir: temp.clone(),
-            release_dir: temp.clone(),
-            watch_dirs: Vec::new(),
-        };
+        let temp = tempfile::tempdir().unwrap();
+        let project = Project::for_tests(temp.path().join("docs"));
         let state = Arc::new(AppState::new(project));
         let app = router(&state);
 
@@ -89,28 +78,15 @@ mod tests {
         state.bump_build();
         let frame = body.frame().await.unwrap().unwrap().into_data().unwrap();
         assert!(std::str::from_utf8(&frame).unwrap().contains("data: 2"));
-
-        let _ = std::fs::remove_dir_all(temp);
     }
 
     #[tokio::test]
     async fn fallback_serves_target_directory() {
-        let temp =
-            std::env::temp_dir().join(format!("fy-docs-server-static-{}", std::process::id()));
-        std::fs::create_dir_all(&temp).unwrap();
-        std::fs::write(temp.join("index.html"), "<p>hello static</p>").unwrap();
+        let temp = tempfile::tempdir().unwrap();
+        let project = Project::for_tests(temp.path().join("docs"));
+        std::fs::create_dir_all(&project.target_dir).unwrap();
+        std::fs::write(project.target_dir.join("index.html"), "<p>hello static</p>").unwrap();
 
-        let project = Project {
-            name: "test".to_owned(),
-            version: "0.1.0".to_owned(),
-            repository: None,
-            targets: Vec::new(),
-            docs_dir: temp.clone(),
-            root: temp.clone(),
-            target_dir: temp.clone(),
-            release_dir: temp.clone(),
-            watch_dirs: Vec::new(),
-        };
         let state = Arc::new(AppState::new(project));
         let app = router(&state);
 
@@ -127,7 +103,5 @@ mod tests {
         assert_eq!(response.status(), 200);
         let bytes = response.into_body().collect().await.unwrap().to_bytes();
         assert_eq!(std::str::from_utf8(&bytes).unwrap(), "<p>hello static</p>");
-
-        let _ = std::fs::remove_dir_all(temp);
     }
 }

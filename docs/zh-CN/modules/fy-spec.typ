@@ -43,6 +43,10 @@ HTML 阅读器样式表（`assets/base.css`）*只*依赖下表列出的类名�
   caption: [`lib.typ` 与 `base.css` 之间的完整类名契约。],
 )
 
+#contract[
+  每种提示框在 HTML 中都保持可辨别：`base.css` 为 `lib.typ` 能产出的每一类都备有样式，于是 `note`、`logic`、`proof`、`math`、`geom`、`axiom`、`motion` 不会塌缩成普通的 `contract` 或 `invariant` 观感。某一类没有样式是缺陷而非风格选择：类名正是样式表据以着色的键，缺少样式只会让该框与普通框长得一模一样，本库定义的这套分类在屏幕上就此消失。
+]
+
 #invariant[
-  `lib.typ` 中任何 `fy-*` 类名的更名必须在同一提交内同步 `assets/base.css`；各项目通过 CI 中的 `cargo fy-docs vendor --check` 锁定本模板版本。
+  类名面是双向契约：本库产出的每个 `fy-*` 类都必须在 `assets/base.css` 中有规则，`base.css` 也不得为没有任何产出方的 `fy-*` 类书写样式。任一侧改名都必须在同一提交内同步另一侧；各项目通过 CI 中的 `cargo fy-docs vendor --check` 锁定本模板版本。
 ]

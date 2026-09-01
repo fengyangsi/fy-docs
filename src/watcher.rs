@@ -21,12 +21,13 @@ pub(crate) fn spawn(state: Arc<AppState>) -> Result<()> {
         // Hold the watcher: dropping it unregisters the watch.
         let _watcher = watcher;
         while wait_for_source_change(&rx, &state.project) {
-            // Reuse the startup options so `dev --lang zh-CN` keeps building
-            // only the filtered language after the first save.
-            let generate = &state.generate;
-            compiler::generate_into(&state, generate.with_pdf, generate.lang_filter.as_deref());
+            // generate reads the captured startup options itself, so
+            // `dev --lang zh-CN` keeps building only the filtered language
+            // after the first save. A failing rebuild leaves the server on
+            // its error pages instead of killing the watcher.
+            let _ = compiler::generate(&state);
             state.bump_build();
-            crate::state::log(&format!(
+            crate::term::log(&format!(
                 "[fy-docs] build #{} finished",
                 state.current_build_id()
             ));
@@ -95,24 +96,9 @@ mod tests {
     use crate::project::Project;
     use std::path::Path;
 
-    fn project_with(docs: std::path::PathBuf) -> Project {
-        Project {
-            name: "watch_test".to_owned(),
-            version: "0.1.0".to_owned(),
-            repository: None,
-            targets: Vec::new(),
-            docs_dir: docs.clone(),
-            root: docs.parent().unwrap().to_path_buf(),
-            target_dir: docs.join("target"),
-            release_dir: docs.join("release"),
-            watch_dirs: vec![docs.clone()],
-        }
-    }
-
     #[test]
     fn is_typ_source_identifies_typst_files() {
-        let temp = std::env::temp_dir().join(format!("fy-docs-watch-src-{}", std::process::id()));
-        let project = project_with(temp.join("docs"));
+        let project = Project::for_tests(std::path::PathBuf::from("docs"));
         assert!(is_typ_source(Path::new("main.typ"), &project));
         assert!(is_typ_source(Path::new("docs/modules/truth.typ"), &project));
         assert!(!is_typ_source(Path::new("index.html"), &project));
@@ -122,8 +108,7 @@ mod tests {
 
     #[test]
     fn generated_directories_are_excluded_by_path() {
-        let temp = std::env::temp_dir().join(format!("fy-docs-watch-excl-{}", std::process::id()));
-        let project = project_with(temp.join("docs"));
+        let project = Project::for_tests(std::path::PathBuf::from("docs"));
         // Even a .typ artifact inside target/ or release/ must not trigger a
         // rebuild (path-level exclusion, not just extension filtering).
         assert!(!is_typ_source(
@@ -167,25 +152,11 @@ mod tests {
 
     #[test]
     fn watcher_spawn_initiates_successfully() {
-        use crate::project::Project;
-
-        let temp = std::env::temp_dir().join(format!("fy-docs-watch-{}", std::process::id()));
-        let docs = temp.join("docs");
-        std::fs::create_dir_all(&docs).unwrap();
-        let project = Project {
-            name: "watch_test".to_owned(),
-            version: "0.1.0".to_owned(),
-            repository: None,
-            targets: Vec::new(),
-            docs_dir: docs.clone(),
-            root: temp.clone(),
-            target_dir: docs.join("target"),
-            release_dir: docs.join("release"),
-            watch_dirs: vec![docs.clone()],
-        };
+        let temp = tempfile::tempdir().unwrap();
+        let project = Project::for_tests(temp.path().join("docs"));
+        std::fs::create_dir_all(&project.docs_dir).unwrap();
         let state = Arc::new(AppState::new(project));
         let res = spawn(state);
         assert!(res.is_ok());
-        let _ = std::fs::remove_dir_all(temp);
     }
 }

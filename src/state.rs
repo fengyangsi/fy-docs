@@ -1,7 +1,6 @@
 //! Shared state: the project, generation options, and the build-id channel.
 
 use crate::project::Project;
-use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 use tokio::sync::watch;
 
@@ -67,79 +66,14 @@ impl AppState {
     }
 }
 
-/// Writes a progress line to stderr. A closed output pipe (e.g. the server is
-/// piped into `head`) must not panic the watcher thread, so write errors are
-/// deliberately ignored.
-pub(crate) fn log(message: &str) {
-    use std::io::Write as _;
-    let _ = writeln!(std::io::stderr().lock(), "{message}");
-}
-
-/// Drops Windows' internal verbatim prefix (`\\?\`, and `\\?\UNC\` for network
-/// paths) from path-like text so terminal output stays readable. Occurrences
-/// anywhere in the text are removed, not just a leading one, because typst
-/// embeds these paths inside its diagnostics.
-pub(crate) fn strip_verbatim(text: &str) -> String {
-    if cfg!(windows) {
-        text.replace(r"\\?\UNC\", r"\\").replace(r"\\?\", "")
-    } else {
-        text.to_owned()
-    }
-}
-
-/// Formats a path for people instead of exposing Windows' internal verbatim
-/// path prefix (for example `\\?\D:\...`) in terminal output.
-pub(crate) fn display_path(path: &Path) -> String {
-    strip_verbatim(&path.display().to_string())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::path::PathBuf;
 
     #[test]
-    fn displays_normal_windows_paths_without_verbatim_prefix() {
-        #[cfg(windows)]
-        assert_eq!(display_path(Path::new(r"\\?\D:\Code\fy")), r"D:\Code\fy");
-    }
-
-    #[cfg(windows)]
-    #[test]
-    fn strips_verbatim_prefixes_anywhere_in_text() {
-        // typst embeds the path inside its diagnostic, not at the start.
-        assert_eq!(
-            strip_verbatim(r"warning: x ┌─ \\?\D:\Code\fy\docs\main.typ:42:1"),
-            r"warning: x ┌─ D:\Code\fy\docs\main.typ:42:1"
-        );
-        assert_eq!(
-            strip_verbatim(r"\\?\UNC\server\share\a.typ"),
-            r"\\server\share\a.typ"
-        );
-    }
-
-    #[cfg(not(windows))]
-    #[test]
-    fn preserves_native_unix_paths() {
-        assert_eq!(display_path(Path::new("/tmp/fy-docs")), "/tmp/fy-docs");
-    }
-
-    #[test]
     fn app_state_tracks_and_broadcasts_build_id() {
-        let temp = std::env::temp_dir().join(format!("fy-docs-state-test-{}", std::process::id()));
-        std::fs::create_dir_all(&temp).unwrap();
-        let project = Project {
-            name: "test".to_owned(),
-            version: "0.1.0".to_owned(),
-            repository: None,
-            targets: Vec::new(),
-            docs_dir: temp.clone(),
-            root: temp.clone(),
-            target_dir: temp.clone(),
-            release_dir: temp.clone(),
-            watch_dirs: Vec::new(),
-        };
-        let state = AppState::new(project);
+        let state = AppState::new(Project::for_tests(PathBuf::new()));
         let events = state.subscribe();
         assert_eq!(state.current_build_id(), 1);
         assert_eq!(*events.borrow(), 1);
@@ -147,29 +81,12 @@ mod tests {
         state.bump_build();
         assert_eq!(state.current_build_id(), 2);
         assert_eq!(*events.borrow(), 2);
-
-        let _ = std::fs::remove_dir_all(temp);
-    }
-
-    #[test]
-    fn log_executes_safely() {
-        log("test log output");
     }
 
     #[test]
     fn with_generate_captures_startup_options() {
         let state = AppState::with_generate(
-            Project {
-                name: "test".to_owned(),
-                version: "0.1.0".to_owned(),
-                repository: None,
-                targets: Vec::new(),
-                docs_dir: PathBuf::new(),
-                root: PathBuf::new(),
-                target_dir: PathBuf::new(),
-                release_dir: PathBuf::new(),
-                watch_dirs: Vec::new(),
-            },
+            Project::for_tests(PathBuf::new()),
             GenerateOptions {
                 with_pdf: true,
                 lang_filter: Some("zh-CN".to_owned()),
@@ -179,17 +96,7 @@ mod tests {
         assert_eq!(state.generate.lang_filter.as_deref(), Some("zh-CN"));
 
         // The plain constructor keeps the dev defaults.
-        let plain = AppState::new(Project {
-            name: "test".to_owned(),
-            version: "0.1.0".to_owned(),
-            repository: None,
-            targets: Vec::new(),
-            docs_dir: PathBuf::new(),
-            root: PathBuf::new(),
-            target_dir: PathBuf::new(),
-            release_dir: PathBuf::new(),
-            watch_dirs: Vec::new(),
-        });
+        let plain = AppState::new(Project::for_tests(PathBuf::new()));
         assert!(!plain.generate.with_pdf);
         assert!(plain.generate.lang_filter.is_none());
     }

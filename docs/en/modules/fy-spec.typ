@@ -43,6 +43,10 @@ The HTML viewer stylesheet (`assets/base.css`) relies *only* on the classes belo
   caption: [The complete class contract between `lib.typ` and `base.css`.],
 )
 
+#contract[
+  Every callout kind stays distinguishable in HTML: `base.css` carries styling for each kind `lib.typ` can emit, so `note`, `logic`, `proof`, `math`, `geom`, `axiom` and `motion` never collapse onto the plain `contract` or `invariant` look. A kind with no rule is a defect, not a stylistic choice: the class is what the stylesheet keys on, so an unstyling leaves that box rendering exactly like a generic one and the taxonomy this library defines stops existing on screen.
+]
+
 #invariant[
-  Any rename of an emitted `fy-*` class in `lib.typ` must be matched in `assets/base.css` within the same commit, and projects stay pinned to this template version via `cargo fy-docs vendor --check` in CI.
+  The class surface is a two-way contract: every `fy-*` class this library emits must carry rules in `assets/base.css`, and `base.css` must not style an `fy-*` class that nothing emits. Any rename on either side is matched in the other file within the same commit, and projects stay pinned to this template version via `cargo fy-docs vendor --check` in CI.
 ]

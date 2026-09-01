@@ -19,6 +19,8 @@
 - **未登记语言码按 BCP 47 形态展示**：基础子标签小写、地区全大写、文字子标签首字母大写，`docs/pt_BR/` 目录在语言切换器中显示为 `pt-BR` 而非照抄目录名；fy-docs 不臆造无法确知的语言名称。
 - **规格章节只陈述现状**：移除文档中的仓库退役叙述、升级史措辞与设计取舍论证，这类历史归本文件。
 - **修正落地页体积 invariant**：原文档声称“1KB 以内”，实测双语已达 1189 字节。现按实测陈述为每语言约 60 字节的线性增长，并由 `assets.rs` 断言锁死。
+- **内部重构，行为不变**：`compiler` 与 `project` 拆分为单一职责的子模块（`compiler/{mod,typst,extract,warnings,output}`、`project/{mod,lang,cargo_meta,imports,template_args}`），终端输出从 `state.rs` 迁入 `term.rs`。启动选项只捕获一次，此后的每一次生成——包括 dev 模式重建——都读取捕获的同一份；默认命令与 `build` 在捕获时即把 PDF 恒置为开启，不再在某一个分发臂里硬编码。`dispatch` 经返回值传递退出码，取代函数中部的 `process::exit`；一次 typst HTML 导出以具名的 `ExtractedPage` 承载，取代裸的三元字符串组；`SKIN_FILE`/`warnings_note` 更名 `STYLE_FILE`/`format_warnings`。命令、旗标、输出文件名与退出码全部不变；测试随函数迁移，所有测试草稿目录统一为 RAII 的 `TempDir`。
+- **规格结构与模块划分对齐**：`docs/` 现为七章——`cli`、`scaffold`、`project`、`compiler`、`page`、`server`、`viewer`——其中 `scaffold`（`init` 与 `vendor` 的设计）和 `page`（`src/assets.rs` 加 `assets/doc.html`）此前没有自己的章节，其契约散记在 `cli` 与 `compiler` 章内。`main.typ` 新增实现文件到章节的归属表，写明箭头由产出方指向消费其产物的一方、表达的是消费分层而非 Rust 的 `use` 图，并把生成外壳的 `id` 与 `class` 集合钉为内部不变量——`viewer.js` 有权直接绑定，无需为元素缺失设防。首次成文的还有：固定分发顺序、二十个候选端口的分配范围、错误到退出码的路径、`/events` 的首帧基线、监听集合及其只认 `.typ` 的规则、共享的忽略规则辅助函数、`typst.css` 的包含即相等合并，以及资产字节归 `page`、资产文件名归 `compiler` 的分工。本次未改任何代码。
 
 ### 修复
 - **页面正文语言标注**：根元素 `lang` 取自顶栏 chrome 语言，而 chrome 文案仅有中英两套，导致其余语言被读屏器与 `:lang()` 断字当作英文。现在页面标注自身规范化的语言标签，chrome 仍回退为英文。
