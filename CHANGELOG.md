@@ -7,6 +7,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Integration tests in the published crate**: the package `include` list now carries `/tests/**`, so an extracted `.crate` keeps the suite its declared dev-dependencies exist for.
+- **Documented language naming rule**: a language folder appends a region or script subtag only when it carries a real difference, `en` stays the neutral English root, and a document is never forked over spelling alone.
+
+### Changed
+- **Unregistered language codes display in BCP 47 shape**: base subtag lowercase, region uppercase, script title-cased, so a `docs/pt_BR/` folder reads `pt-BR` in the language switcher instead of leaking the directory name. fy-docs never invents a language name it cannot know.
+- **Specification chapters state current behaviour**: retired-repository notes, upgrade-history framing and design-decision narration were removed from the docs; that history belongs here.
+- **Corrected landing-page size invariant**: the documented "under 1KB" was already exceeded (1189 bytes at two languages). The rule is now stated as measured, roughly 60 bytes per language, and `assets.rs` enforces the bound.
+
+### Fixed
+- **Page content language**: the root `lang` attribute carried the toolbar chrome language, which exists in English and Chinese only, so every other language announced itself as English to assistive technology and `:lang()` hyphenation. A page now declares its own normalized tag while the chrome still falls back to English.
+
+### Removed
+- The `docs/target/` sweep no longer deletes `_poll.js` and `_build`. The current build never writes them; keeping them listed made the tool carry its own upgrade history, and every release could only lengthen that list. `_temp_*.html` intermediates a killed compile leaves behind are still swept.
+
 ## [0.1.10] - 2026-08-31
 
 ### Added

@@ -9,15 +9,15 @@ The `compiler` module invokes the `typst` CLI to produce modern HTML output and 
 ]
 
 #contract[
-  When `typst` exits successfully, everything it wrote to stderr (unknown font families, directives ignored during HTML export) is forwarded to fy-docs' stderr instead of discarded, so silent font substitution and degraded rendering stay visible. The one exception is the unknown-font-family warning: the fallback chain lists candidates from several operating systems and typst repeats every unavailable family at each style site, so those collapse into one deduplicated line while all other warnings pass through verbatim.
+  When `typst` exits successfully its stderr is forwarded to fy-docs' stderr, keeping font substitution and HTML-export degradation visible. Unknown-font-family warnings collapse into one line per family; every other warning passes through verbatim. Windows verbatim path prefixes are stripped from forwarded diagnostics.
 ]
 
 #contract[
-  Every build first sweeps `docs/target/`: artifacts fy-docs no longer writes (the polling-era `_poll.js` client and its `_build` marker) and `_temp_*.html` intermediates left by a killed compile, so an upgraded project never keeps serving retired files.
+  A build removes the `_temp_*.html` compile intermediates an interrupted process left behind.
 ]
 
 #contract[
-  When the `--with-pdf` stage fails, the root `index.html` must still exist after the per-language error pages are written: in a pure i18n project `index.html` belongs to no single target, and without it the dev server has no route for `/`.
+  When the `--with-pdf` stage fails, the per-language error pages are written and the root `index.html` is still guaranteed to exist. In a pure i18n project `index.html` is the routing landing page and belongs to no single language target.
 ]
 
 #contract[
@@ -29,5 +29,5 @@ The `compiler` module invokes the `typst` CLI to produce modern HTML output and 
 ]
 
 #invariant[
-  The root `index.html` landing page generated in multi-language mode must remain under 1KB, never copying body text, and dynamically route visitors based on language priority with English fallback.
+  The root `index.html` landing page generated in multi-language mode carries only the redirect script and the language list, never body text. Its size grows by roughly 60 bytes per language and stays under 1.4KB with five languages.
 ]

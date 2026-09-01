@@ -9,6 +9,10 @@ The `viewer` module powers the responsive reader interface and multi-language co
 ]
 
 #contract[
+  The root element's `lang` describes the *content* language: a named language target emits its normalized BCP 47 tag (`pt_BR` becomes `pt-BR`, base subtag lowercase, region uppercase, script title-cased), while a tagless default target is inferred from the body (`zh-CN` when it contains CJK ideographs, otherwise `en`). Toolbar chrome exists in English and Chinese only and `viewer.js` selects between them from the `lang` prefix, so content language and chrome language are independent axes: an untranslated language wears English chrome while its root tag still names it truthfully.
+]
+
+#contract[
   Provides 5 refined dark/light themes (Light, Rust, Coal, Navy, Ayu) and system synchronization. Both toolbar title and sidebar brand navigate back to the book cover upon click.
 ]
 

@@ -73,6 +73,20 @@ pub(crate) fn ui_text(lang_hint: Option<&str>, body: &str) -> UiText {
     }
 }
 
+/// The language of the page *content*, written on the document root.
+///
+/// Chrome strings and content language are two separate axes: toolbar labels
+/// exist only in English and Chinese and `viewer.js` picks between them from
+/// the root `lang` prefix, but the root attribute itself must describe the
+/// text. A Portuguese document therefore says `pt-BR` while wearing English
+/// chrome, rather than claiming to be English.
+fn content_lang(target: Option<&LanguageTarget>, ui: &UiText) -> String {
+    match target.map(|t| crate::project::normalize_lang(&t.lang)) {
+        Some(tag) if !tag.is_empty() => crate::project::format_lang(&tag),
+        _ => ui.language.to_owned(),
+    }
+}
+
 /// Renders the generated page. The Typst body is already trimmed; GitHub is
 /// linked only when the package declares that repository.
 pub(crate) fn doc_page(
@@ -98,7 +112,7 @@ pub(crate) fn doc_page(
     DOC_TEMPLATE
         .replace("{{TITLE}}", &escape(title))
         .replace("{{NAME}}", &escape(name))
-        .replace("{{LANG}}", ui.language)
+        .replace("{{LANG}}", &content_lang(current_target, &ui))
         .replace("{{SIDEBAR_TOGGLE}}", ui.sidebar_toggle)
         .replace("{{THEME}}", ui.theme)
         .replace("{{SYSTEM_THEME}}", ui.system_theme)
@@ -326,6 +340,24 @@ mod tests {
     }
 
     #[test]
+    fn page_lang_describes_content_not_chrome() {
+        let pt = LanguageTarget {
+            lang: "pt_BR".to_owned(),
+            display_name: "pt-BR".to_owned(),
+            entry: std::path::PathBuf::from("docs/pt_BR/main.typ"),
+            html_file_name: "index_pt_BR.html".to_owned(),
+            pdf_file_name: "x.pdf".to_owned(),
+        };
+        // English toolbar labels must not relabel a Portuguese document.
+        let page = doc_page("Doc", "fy-x", None, "<h1>Olá</h1>", Some(&pt), &[]);
+        assert!(page.contains(r#"<html lang="pt-BR">"#), "{page}");
+
+        // A tagless default target keeps inferring from the body.
+        let zh = doc_page("T", "fy-x", None, "<h1>内容</h1>", None, &[]);
+        assert!(zh.contains(r#"<html lang="zh-CN">"#), "{zh}");
+    }
+
+    #[test]
     fn lang_hint_overrides_body_detection() {
         let zh_target = LanguageTarget {
             lang: "zh-CN".to_owned(),
@@ -354,7 +386,10 @@ mod tests {
             Some(&ja_target),
             &[],
         );
-        assert!(page.contains("<html lang=\"en\">"));
+        // The root tag names the document; only the chrome falls back to English.
+        assert!(page.contains("<html lang=\"ja\">"), "{page}");
+        assert!(page.contains("title=\"Theme\""), "{page}");
+        assert!(!page.contains("主题"), "{page}");
     }
 
     #[test]
@@ -401,5 +436,33 @@ mod tests {
         assert!(html.contains(r#"<a href="index_zh-CN.html">简体中文</a>"#));
         assert!(html.contains(r#"<a href="index_ja.html">日本語</a>"#));
         assert!(html.contains("location.replace('index_en.html')"));
+    }
+
+    #[test]
+    fn landing_page_stays_lightweight() {
+        let target = |lang: &str| LanguageTarget {
+            lang: lang.to_owned(),
+            display_name: lang.to_owned(),
+            entry: std::path::PathBuf::from(format!("docs/{lang}/main.typ")),
+            html_file_name: format!("index_{lang}.html"),
+            pdf_file_name: format!("x_{lang}.pdf"),
+        };
+        let targets: Vec<LanguageTarget> = ["en", "zh-CN", "ja", "de", "fr"]
+            .iter()
+            .map(|l| target(l))
+            .collect();
+
+        let page = redirect_page(&targets);
+        // The compiler chapter's invariant: routing script and language list
+        // only, so five languages stay well under 1.4KB.
+        assert!(
+            page.len() < 1434,
+            "landing page grew to {} bytes",
+            page.len()
+        );
+        assert!(
+            !page.contains("<h1") && !page.contains("fy-docs.js"),
+            "the landing page must never carry document body or viewer assets"
+        );
     }
 }

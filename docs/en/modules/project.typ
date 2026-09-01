@@ -25,19 +25,27 @@ docs/
 ]
 
 #contract[
-  When no language target matches after normalization, the build fails with a non-zero exit code and lists the languages the project actually provides. A misspelled `--lang` never silently degrades to "build the default target only".
+  When no language target matches after normalization, the build fails with a non-zero exit code and lists the languages the project actually provides.
 ]
 
 #contract[
-  Language detection uses a positive rule: any `docs/` subdirectory carrying its own `main.typ` is a language target, except the generated directories (`target/`, `release/`). Shared source folders such as `fy-spec/` and `modules/` need no denylist because they hold no `main.typ`.
+  Language detection uses a positive rule: any `docs/` subdirectory carrying its own `main.typ` is a language target, except the generated directories (`target/`, `release/`).
 ]
 
 #contract[
-  When the manifest declares no version, the fallback reads the entry `main.typ`'s `version:` argument from uncommented code only: a version inside prose or a disabled example must never become the project version.
+  When the manifest declares no version, the fallback reads the entry `main.typ`'s `version:` argument from uncommented code only; a version inside a comment never becomes the project version.
 ]
 
 #contract[
   The absolute-import scan behind root detection respects lexical boundaries: both quote styles are recognized and everything after `//` is a comment, so a commented-out `#import` cannot drag the root to the wrong ancestor.
+]
+
+#contract[
+  Language folders follow BCP 47 layering: the base language subtag decides the translation, and a region or script subtag is appended *only when it carries a real difference* (`zh-CN`/`zh-TW`, `pt-BR`/`pt-PT`). `en` stays the neutral English root with no region, and a document must never be forked over spelling alone. Adding a language means registering it in both the `lang_display_name` table and the template's `i18n-strings` base keys.
+]
+
+#contract[
+  An unregistered language tag is displayed in normalized BCP 47 shape: base subtag lowercase, region subtag uppercase, script subtag title-cased (`pt_BR` becomes `pt-BR`, `zh_hant_tw` becomes `zh-Hant-TW`). fy-docs never invents a language name it cannot know.
 ]
 
 #invariant[

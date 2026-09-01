@@ -2,7 +2,7 @@
 
 = fy-spec Library: The Embedded Typst Template <sec-fy-spec>
 
-`fy-spec` is the Typst template library embedded in the fy-docs binary and vendored into every project at `docs/fy-spec/lib.typ`. This repository is its single source of truth: `docs/fy-spec/` carries `lib.typ`, the `typst.toml` package manifest, and `examples/basic.typ` as a compile-time smoke test. The former standalone `fy-spec` repository is retired.
+`fy-spec` is the Typst template library embedded in the fy-docs binary and vendored into every project at `docs/fy-spec/lib.typ`. This repository is its single source of truth: `docs/fy-spec/` carries `lib.typ`, the `typst.toml` package manifest, and `examples/basic.typ` as a compile-time smoke test.
 
 #status-badge(status: "已确立", phase: "模板 v0.1.0")
 

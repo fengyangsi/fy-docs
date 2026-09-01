@@ -2,7 +2,7 @@
 
 = fy-spec 模板库：内嵌 Typst 排版系统 <sec-fy-spec>
 
-`fy-spec` 是内嵌于 fy-docs 二进制、并以 `docs/fy-spec/lib.typ` 形式随项目分发的 Typst 模板库。本仓库是其唯一真身：`docs/fy-spec/` 内含 `lib.typ`、包清单 `typst.toml` 与冒烟示例 `examples/basic.typ`；原独立仓库 `fy-spec` 已退役。
+`fy-spec` 是内嵌于 fy-docs 二进制、并以 `docs/fy-spec/lib.typ` 形式随项目分发的 Typst 模板库。本仓库是其唯一真身：`docs/fy-spec/` 内含 `lib.typ`、包清单 `typst.toml` 与冒烟示例 `examples/basic.typ`。
 
 #status-badge(status: "已确立", phase: "模板 v0.1.0")
 

@@ -82,7 +82,7 @@ impl Project {
 
 /// Maps language codes to user-friendly native display labels.
 pub(crate) fn lang_display_name(lang: &str) -> String {
-    match lang.to_lowercase().replace('_', "-").as_str() {
+    match normalize_lang(lang).as_str() {
         "zh" | "zh-cn" | "zh-hans" => "简体中文".to_owned(),
         "zh-tw" | "zh-hk" | "zh-hant" => "繁體中文".to_owned(),
         "en" | "en-us" | "en-gb" => "English".to_owned(),
@@ -91,7 +91,37 @@ pub(crate) fn lang_display_name(lang: &str) -> String {
         "fr" | "fr-fr" => "Français".to_owned(),
         "ru" | "ru-ru" => "Русский".to_owned(),
         "es" | "es-es" => "Español".to_owned(),
-        _ => lang.to_owned(),
+        other => format_lang(other),
+    }
+}
+
+/// Rewrites an unregistered tag into BCP 47 display shape: the base subtag
+/// stays lowercase and every following subtag is cased by length. Guessing a
+/// name would be worse than showing a correct code.
+pub(crate) fn format_lang(tag: &str) -> String {
+    let mut subtags = tag.split('-');
+    let base = subtags.next().unwrap_or_default().to_owned();
+    let rest: Vec<String> = subtags.map(format_subtag).collect();
+    if rest.is_empty() {
+        base
+    } else {
+        format!("{base}-{}", rest.join("-"))
+    }
+}
+
+/// Two-character subtags are regions (`CN`); longer ones are scripts or
+/// variants and take title case (`Hans`, `Latn`).
+fn format_subtag(subtag: &str) -> String {
+    if subtag.chars().count() == 2 {
+        return subtag.to_uppercase();
+    }
+    let mut chars = subtag.chars();
+    match chars.next() {
+        Some(first) => {
+            let capitalized: String = first.to_uppercase().collect();
+            capitalized + chars.as_str()
+        }
+        None => String::new(),
     }
 }
 
@@ -612,5 +642,28 @@ mod tests {
             vec!["a.typ".to_owned()]
         );
         assert!(quoted_absolute_typs(r#"#import "relative/lib.typ": *"#).is_empty());
+    }
+
+    #[test]
+    fn registered_languages_keep_their_endonyms() {
+        for (tag, label) in [
+            ("zh-CN", "简体中文"),
+            ("zh_CN", "简体中文"),
+            ("EN", "English"),
+            ("ja-JP", "日本語"),
+            ("zh-Hant", "繁體中文"),
+        ] {
+            assert_eq!(lang_display_name(tag), label, "{tag}");
+        }
+    }
+
+    #[test]
+    fn unregistered_tags_display_a_well_formed_code() {
+        // Shape only: fy-docs cannot know what language a bare code means, so
+        // it must not invent a name for it either.
+        assert_eq!(lang_display_name("pt_BR"), "pt-BR");
+        assert_eq!(lang_display_name("fil"), "fil");
+        assert_eq!(lang_display_name("zh_hant_tw"), "zh-Hant-TW");
+        assert_eq!(lang_display_name("  sr_latn_rs "), "sr-Latn-RS");
     }
 }

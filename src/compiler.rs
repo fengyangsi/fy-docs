@@ -17,11 +17,6 @@ pub(crate) const LIVE_JS_FILE: &str = "live.js";
 /// Prefix of the throwaway HTML file each language target compiles through.
 const TEMP_PREFIX: &str = "_temp_";
 
-/// Outputs older fy-docs wrote into `docs/target/` and current code no longer
-/// does: the polling reload client and its build marker, both replaced by the
-/// SSE `/events` stream. Without a sweep they survive an upgrade forever.
-const RETIRED_OUTPUTS: &[&str] = &["_poll.js", "_build"];
-
 /// The oldest typst release that accepts every flag fy-docs passes:
 /// `--pdf-standard 2.0` first shipped in Typst 0.14.
 const MINIMUM_TYPST: (u64, u64, u64) = (0, 14, 0);
@@ -86,7 +81,7 @@ type HtmlParts = (String, String, String);
 fn generate(project: &Project, with_pdf: bool, lang_filter: Option<&str>) -> Result<()> {
     let target = &project.target_dir;
     fs::create_dir_all(target)?;
-    clean_stale_outputs(target)?;
+    clean_compile_temporaries(target)?;
 
     let selected_targets = select_targets(project, lang_filter)?;
 
@@ -215,20 +210,12 @@ fn generate(project: &Project, with_pdf: bool, lang_filter: Option<&str>) -> Res
     }
 }
 
-/// Sweeps output a previous run could leave behind: intermediates from a
-/// compile that was killed mid-way, and artifacts newer fy-docs no longer
-/// writes but an upgraded project would keep serving.
-fn clean_stale_outputs(target: &Path) -> Result<()> {
-    for name in RETIRED_OUTPUTS {
-        let path = target.join(name);
-        if path.is_file() {
-            fs::remove_file(&path)
-                .with_context(|| format!("could not remove stale {}", path.display()))?;
-        }
-    }
+/// Sweeps the `_temp_*.html` intermediates a compile killed mid-way left in
+/// the output directory: a target that finishes removes its own intermediate
+/// on success and on failure alike, so anything still there is orphaned.
+fn clean_compile_temporaries(target: &Path) -> Result<()> {
     for entry in fs::read_dir(target)?.flatten() {
-        let name = entry.file_name();
-        let name = name.to_string_lossy();
+        let name = entry.file_name().to_string_lossy().into_owned();
         if name.starts_with(TEMP_PREFIX) && name.ends_with(".html") {
             let _ = fs::remove_file(entry.path());
         }
@@ -809,24 +796,16 @@ mod tests {
     }
 
     #[test]
-    fn clean_stale_outputs_sweeps_retired_and_leaked_files() {
+    fn clean_compile_temporaries_sweeps_leaked_files() {
         let temp = std::env::temp_dir().join(format!("fy-docs-clean-{}", std::process::id()));
         let _ = fs::remove_dir_all(&temp);
         fs::create_dir_all(&temp).unwrap();
-        for name in [
-            "_poll.js",
-            "_build",
-            "_temp_zh-CN_4242.html",
-            "index.html",
-            "typst.css",
-        ] {
+        for name in ["_temp_zh-CN_4242.html", "index.html", "typst.css"] {
             fs::write(temp.join(name), "x").unwrap();
         }
 
-        clean_stale_outputs(&temp).unwrap();
+        clean_compile_temporaries(&temp).unwrap();
 
-        assert!(!temp.join("_poll.js").exists(), "retired client must go");
-        assert!(!temp.join("_build").exists(), "retired marker must go");
         assert!(
             !temp.join("_temp_zh-CN_4242.html").exists(),
             "a killed compile's intermediate must go"
@@ -836,7 +815,7 @@ mod tests {
         assert!(temp.join("typst.css").is_file());
 
         // Sweeping an already clean directory is a no-op.
-        clean_stale_outputs(&temp).unwrap();
+        clean_compile_temporaries(&temp).unwrap();
         let _ = fs::remove_dir_all(temp);
     }
 
